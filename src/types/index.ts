@@ -1,7 +1,9 @@
 // Export all types from a single entry point
+export * from './base';
 export * from './canvas';
 export * from './objects';
 export * from './tools';
+export * from './state';
 
 // Additional utility types
 export interface ExportOptions {

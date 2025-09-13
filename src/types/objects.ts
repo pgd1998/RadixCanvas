@@ -1,4 +1,4 @@
-import { Rectangle, Transform } from './canvas';
+import type { Rectangle, Transform, Point } from './base';
 
 export type ObjectType = 'rectangle' | 'circle' | 'text' | 'line';
 
@@ -29,10 +29,6 @@ export interface CanvasObject {
   points?: Point[];  // Line objects
 }
 
-export interface Point {
-  x: number;
-  y: number;
-}
 
 export interface TextObject extends CanvasObject {
   type: 'text';

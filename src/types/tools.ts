@@ -1,4 +1,5 @@
-import { CanvasObject, ObjectType } from './objects';
+import type { CanvasObject, ObjectType } from './objects';
+import type { Point } from './base';
 
 export type ToolType = 'select' | 'rectangle' | 'circle' | 'text' | 'line' | 'pan';
 
