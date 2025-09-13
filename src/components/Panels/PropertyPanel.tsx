@@ -1,68 +1,11 @@
 import React from 'react';
 import * as Slider from '@radix-ui/react-slider';
-import * as Popover from '@radix-ui/react-popover';
+import { EnhancedColorPicker } from '../UI/EnhancedColorPicker';
 import type { CanvasObject } from '../../types/objects';
 
 interface PropertyPanelProps {
   selectedObjects: CanvasObject[];
   onPropertyChange: (property: string, value: any) => void;
-}
-
-const PRESET_COLORS = [
-  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
-  '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
-  '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#64748b'
-];
-
-function ColorPicker({ 
-  value, 
-  onChange, 
-  label 
-}: { 
-  value: string; 
-  onChange: (color: string) => void; 
-  label: string;
-}) {
-  return (
-    <div className="modern-field">
-      <label className="modern-label">{label}</label>
-      <Popover.Root>
-        <Popover.Trigger asChild>
-          <button className="modern-color-button">
-            <div 
-              className="modern-color-swatch"
-              style={{ backgroundColor: value }}
-            />
-            <span>{value}</span>
-          </button>
-        </Popover.Trigger>
-        <Popover.Portal>
-          <Popover.Content 
-            className="modern-popover"
-            sideOffset={8}
-          >
-            <div className="modern-color-grid">
-              {PRESET_COLORS.map(color => (
-                <button
-                  key={color}
-                  className="modern-color-preset"
-                  style={{ backgroundColor: color }}
-                  onClick={() => onChange(color)}
-                />
-              ))}
-            </div>
-            <input
-              type="color"
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              style={{ width: '100%', height: '32px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-light)' }}
-            />
-            <Popover.Arrow className="fill-current" />
-          </Popover.Content>
-        </Popover.Portal>
-      </Popover.Root>
-    </div>
-  );
 }
 
 export function PropertyPanel({ selectedObjects, onPropertyChange }: PropertyPanelProps) {
@@ -93,14 +36,14 @@ export function PropertyPanel({ selectedObjects, onPropertyChange }: PropertyPan
 
       <div className="modern-section">
         {/* Fill Color */}
-        <ColorPicker
+        <EnhancedColorPicker
           value={firstObject.style.fill}
           onChange={(color) => onPropertyChange('fill', color)}
           label="Fill"
         />
 
         {/* Stroke Color */}
-        <ColorPicker
+        <EnhancedColorPicker
           value={firstObject.style.stroke}
           onChange={(color) => onPropertyChange('stroke', color)}
           label="Stroke"
