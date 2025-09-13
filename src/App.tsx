@@ -137,12 +137,12 @@ function App() {
   return (
     <div className="w-screen h-screen flex flex-col overflow-hidden bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between min-h-[60px] flex-shrink-0 shadow-sm z-50">
-        <h1 className="text-xl font-bold text-gray-900">RadixCanvas</h1>
-        <div className="flex items-center gap-4 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
-          <span className="font-medium">Objects: {objects.length}</span>
+      <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between min-h-[72px] flex-shrink-0 shadow-sm z-50 gap-6">
+        <h1 className="text-xl font-bold text-gray-900 flex-shrink-0">RadixCanvas</h1>
+        <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-lg px-4 py-2 min-w-fit flex-shrink-0">
+          <span className="font-medium whitespace-nowrap">Objects: {objects.length}</span>
           <div className="w-px h-4 bg-gray-300"></div>
-          <span className="font-medium">Selected: {selectedIds.length}</span>
+          <span className="font-medium whitespace-nowrap">Selected: {selectedIds.length}</span>
         </div>
       </header>
 
