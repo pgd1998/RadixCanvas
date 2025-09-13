@@ -17,6 +17,7 @@ interface InfiniteCanvasProps {
   onObjectCreate?: (object: CanvasObject) => void;
   onObjectUpdate?: (object: CanvasObject) => void;
   onCanvasAction?: (action: string, data: any) => void;
+  onViewportChange?: (viewport: { x: number; y: number; zoom: number }) => void;
 }
 
 export function InfiniteCanvas({
@@ -27,7 +28,8 @@ export function InfiniteCanvas({
   onObjectClick,
   onObjectCreate,
   onObjectUpdate,
-  onCanvasAction
+  onCanvasAction,
+  onViewportChange
 }: InfiniteCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { viewport, panTo, zoomTo, screenToWorld } = useViewport();
@@ -501,6 +503,13 @@ export function InfiniteCanvas({
     setResizeStartPoint(worldPos);
     setResizeStartBounds(selectedObject.bounds);
   }, [selectedIds, objects, screenToWorld]);
+
+  // Notify parent of viewport changes
+  useEffect(() => {
+    if (onViewportChange) {
+      onViewportChange(viewport);
+    }
+  }, [viewport, onViewportChange]);
 
   // Keyboard shortcuts
   useEffect(() => {

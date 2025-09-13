@@ -3,8 +3,10 @@ import { InfiniteCanvas } from './components/Canvas/InfiniteCanvas';
 import { ToolPanel } from './components/Tools/ToolPanel';
 import { PropertyPanel } from './components/Panels/PropertyPanel';
 import { LayerPanel } from './components/Panels/LayerPanel';
+import { ExportDialog } from './components/Dialogs/ExportDialog';
 import type { CanvasObject } from './types/objects';
 import type { ToolType } from './types/tools';
+import { Download, Menu } from 'lucide-react';
 import './styles/modern.css';
 
 function App() {
@@ -68,6 +70,8 @@ function App() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTool, setActiveTool] = useState<ToolType>('select');
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
 
   const handleObjectClick = (objectId: string, event: React.MouseEvent) => {
     if (event.ctrlKey || event.metaKey) {
@@ -110,6 +114,12 @@ function App() {
     // Keep the current tool active for continuous drawing
   };
 
+  const handleProjectLoad = (loadedObjects: CanvasObject[], loadedViewport: { x: number; y: number; zoom: number }) => {
+    setObjects(loadedObjects);
+    setViewport(loadedViewport);
+    setSelectedIds([]);
+  };
+
   // Keyboard event handler for delete functionality
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -143,7 +153,29 @@ function App() {
     <div className="modern-app w-screen h-screen flex flex-col overflow-hidden">
       {/* Header */}
       <header className="modern-header px-8 py-4 flex items-center justify-between min-h-[72px] flex-shrink-0 z-50 gap-6">
-        <h1 className="flex-shrink-0">RadixCanvas</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="flex-shrink-0">RadixCanvas</h1>
+          <button
+            onClick={() => setExportDialogOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-200 hover:border-gray-300 transition-colors text-sm font-medium"
+            style={{
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border-light)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--color-text-secondary)',
+              fontSize: '13px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--spacing-xs)'
+            }}
+          >
+            <Download size={14} />
+            Export
+          </button>
+        </div>
         <div className="modern-stats flex items-center gap-3 min-w-fit flex-shrink-0">
           <span className="whitespace-nowrap">Objects: {objects.length}</span>
           <div className="w-px h-4 bg-current opacity-20"></div>
@@ -171,6 +203,7 @@ function App() {
             onObjectClick={handleObjectClick}
             onObjectCreate={handleObjectCreate}
             onObjectUpdate={handleObjectUpdate}
+            onViewportChange={setViewport}
           />
         </main>
 
@@ -190,6 +223,16 @@ function App() {
           />
         </aside>
       </div>
+
+      {/* Export Dialog */}
+      <ExportDialog
+        isOpen={exportDialogOpen}
+        onClose={() => setExportDialogOpen(false)}
+        objects={objects}
+        selectedIds={selectedIds}
+        viewport={viewport}
+        onProjectLoad={handleProjectLoad}
+      />
     </div>
   );
 }
