@@ -164,6 +164,65 @@ function App() {
     setTimeout(handlePaste, 10); // Small delay to ensure clipboard is set
   }, [handleCopy, handlePaste]);
 
+  // Layer management functions
+  const handleLayerReorder = useCallback((objectId: string, newLayer: number) => {
+    setObjects(prev => {
+      // Find the object being moved
+      const objectToMove = prev.find(obj => obj.id === objectId);
+      if (!objectToMove) return prev;
+
+      // Update all objects' layers to accommodate the reordering
+      return prev.map(obj => {
+        if (obj.id === objectId) {
+          return { ...obj, layer: newLayer, isDirty: true };
+        }
+        
+        // Adjust other objects' layers if necessary
+        if (objectToMove.layer < newLayer && obj.layer > objectToMove.layer && obj.layer <= newLayer) {
+          return { ...obj, layer: obj.layer - 1, isDirty: true };
+        } else if (objectToMove.layer > newLayer && obj.layer >= newLayer && obj.layer < objectToMove.layer) {
+          return { ...obj, layer: obj.layer + 1, isDirty: true };
+        }
+        
+        return obj;
+      });
+    });
+  }, []);
+
+  const handleObjectDelete = useCallback((objectId: string) => {
+    setObjects(prev => prev.filter(obj => obj.id !== objectId));
+    setSelectedIds(prev => prev.filter(id => id !== objectId));
+  }, []);
+
+  const handleBulkOperation = useCallback((operation: 'hide' | 'show' | 'lock' | 'unlock' | 'delete', objectIds: string[]) => {
+    switch (operation) {
+      case 'hide':
+        setObjects(prev => prev.map(obj => 
+          objectIds.includes(obj.id) ? { ...obj, visible: false, isDirty: true } : obj
+        ));
+        break;
+      case 'show':
+        setObjects(prev => prev.map(obj => 
+          objectIds.includes(obj.id) ? { ...obj, visible: true, isDirty: true } : obj
+        ));
+        break;
+      case 'lock':
+        setObjects(prev => prev.map(obj => 
+          objectIds.includes(obj.id) ? { ...obj, locked: true, isDirty: true } : obj
+        ));
+        break;
+      case 'unlock':
+        setObjects(prev => prev.map(obj => 
+          objectIds.includes(obj.id) ? { ...obj, locked: false, isDirty: true } : obj
+        ));
+        break;
+      case 'delete':
+        setObjects(prev => prev.filter(obj => !objectIds.includes(obj.id)));
+        setSelectedIds(prev => prev.filter(id => !objectIds.includes(id)));
+        break;
+    }
+  }, []);
+
   // Keyboard event handler for shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -320,6 +379,9 @@ function App() {
             selectedIds={selectedIds}
             onObjectUpdate={handleObjectUpdate}
             onSelectionChange={setSelectedIds}
+            onLayerReorder={handleLayerReorder}
+            onObjectDelete={handleObjectDelete}
+            onBulkOperation={handleBulkOperation}
           />
         </aside>
       </div>

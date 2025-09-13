@@ -345,6 +345,24 @@
   background: var(--color-bg-secondary);
 }
 
+/* Enhanced Layer Panel - Drag and Drop */
+.modern-layer-item[draggable="true"] {
+  user-select: none;
+}
+
+.modern-layer-item[draggable="true"]:hover {
+  cursor: grab;
+}
+
+.modern-layer-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Bulk Operations */
+.modern-layer-item.selected .modern-layer-controls {
+  opacity: 1;
+}
+
 /* Modern Accordion */
 .modern-accordion-trigger {
   width: 100%;
