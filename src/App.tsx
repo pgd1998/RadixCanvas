@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { InfiniteCanvas } from './components/Canvas/InfiniteCanvas';
 import { ToolPanel } from './components/Tools/ToolPanel';
 import { PropertyPanel } from './components/Panels/PropertyPanel';
@@ -7,6 +7,7 @@ import { ExportDialog } from './components/Dialogs/ExportDialog';
 import type { CanvasObject } from './types/objects';
 import type { ToolType } from './types/tools';
 import { Download, Menu } from 'lucide-react';
+import { isModifierPressed } from './utils/platform';
 import './styles/modern.css';
 
 function App() {
@@ -72,6 +73,7 @@ function App() {
   const [activeTool, setActiveTool] = useState<ToolType>('select');
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
+  const [clipboard, setClipboard] = useState<CanvasObject[]>([]);
 
   const handleObjectClick = (objectId: string, event: React.MouseEvent) => {
     if (event.ctrlKey || event.metaKey) {
@@ -120,22 +122,120 @@ function App() {
     setSelectedIds([]);
   };
 
-  // Keyboard event handler for delete functionality
+  const handleCopy = useCallback(() => {
+    const selectedObjects = objects.filter(obj => selectedIds.includes(obj.id));
+    if (selectedObjects.length > 0) {
+      setClipboard([...selectedObjects]);
+    }
+  }, [objects, selectedIds]);
+
+  const handlePaste = useCallback(() => {
+    if (clipboard.length > 0) {
+      const pastedObjects = clipboard.map(obj => ({
+        ...obj,
+        id: `obj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        bounds: {
+          ...obj.bounds,
+          x: obj.bounds.x + 20, // Offset pasted objects
+          y: obj.bounds.y + 20
+        },
+        layer: Math.max(...objects.map(o => o.layer), 0) + 1,
+        isDirty: true
+      }));
+      
+      setObjects(prev => [...prev, ...pastedObjects]);
+      setSelectedIds(pastedObjects.map(obj => obj.id));
+    }
+  }, [clipboard, objects]);
+
+  const handleSelectAll = useCallback(() => {
+    const visibleObjectIds = objects
+      .filter(obj => obj.visible && !obj.locked)
+      .map(obj => obj.id);
+    setSelectedIds(visibleObjectIds);
+  }, [objects]);
+
+  const handleDeselectAll = useCallback(() => {
+    setSelectedIds([]);
+  }, []);
+
+  const handleDuplicate = useCallback(() => {
+    handleCopy();
+    setTimeout(handlePaste, 10); // Small delay to ensure clipboard is set
+  }, [handleCopy, handlePaste]);
+
+  // Keyboard event handler for shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Check if Delete or Backspace key is pressed
+      // Only handle shortcuts if we're not focused on an input element
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement?.tagName === 'INPUT' || 
+                            activeElement?.tagName === 'TEXTAREA' || 
+                            (activeElement as HTMLElement)?.contentEditable === 'true';
+      
+      if (isInputFocused) return;
+
+      // Delete/Backspace - Delete selected objects
       if (event.key === 'Delete' || event.key === 'Backspace') {
-        // Only delete if we're not focused on an input element
-        const activeElement = document.activeElement;
-        const isInputFocused = activeElement?.tagName === 'INPUT' || 
-                              activeElement?.tagName === 'TEXTAREA' || 
-                              (activeElement as HTMLElement)?.contentEditable === 'true';
-        
-        if (!isInputFocused && selectedIds.length > 0) {
+        if (selectedIds.length > 0) {
           event.preventDefault();
-          // Directly perform the deletion logic here to avoid dependency issues
           setObjects(prev => prev.filter(obj => !selectedIds.includes(obj.id)));
           setSelectedIds([]);
+        }
+        return;
+      }
+
+      // Handle Ctrl/Cmd combinations (cross-platform support)
+      if (isModifierPressed(event)) {
+        switch (event.key.toLowerCase()) {
+          case 'c':
+            event.preventDefault();
+            handleCopy();
+            break;
+          case 'v':
+            event.preventDefault();
+            handlePaste();
+            break;
+          case 'd':
+            event.preventDefault();
+            handleDuplicate();
+            break;
+          case 'a':
+            event.preventDefault();
+            handleSelectAll();
+            break;
+        }
+        return;
+      }
+
+      // Tool shortcuts (only when no modifiers)
+      if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+        switch (event.key.toLowerCase()) {
+          case 'v':
+            event.preventDefault();
+            setActiveTool('select');
+            break;
+          case 'r':
+            event.preventDefault();
+            setActiveTool('rectangle');
+            break;
+          case 'c':
+            event.preventDefault();
+            setActiveTool('circle');
+            break;
+          case 't':
+            event.preventDefault();
+            setActiveTool('text');
+            break;
+          case 'l':
+            event.preventDefault();
+            setActiveTool('line');
+            break;
+          case 'escape':
+            event.preventDefault();
+            handleDeselectAll();
+            setActiveTool('select');
+            break;
         }
       }
     };
@@ -147,7 +247,7 @@ function App() {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedIds]);
+  }, [selectedIds, handleCopy, handlePaste, handleDuplicate, handleSelectAll, handleDeselectAll, setActiveTool]);
 
   return (
     <div className="modern-app w-screen h-screen flex flex-col overflow-hidden">

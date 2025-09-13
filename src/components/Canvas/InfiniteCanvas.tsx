@@ -3,10 +3,12 @@ import { useViewport } from '../../hooks/useViewport';
 import { GridLayer } from './GridLayer';
 import { CanvasRenderer } from './CanvasRenderer';
 import { ResizeHandles } from './ResizeHandles';
+import { SelectionOutlines } from './SelectionOutlines';
 import { TextInput } from '../UI/TextInput';
 import type { CanvasObject } from '../../types/objects';
 import type { ToolType } from '../../types/tools';
 import type { ResizeHandle } from '../../types/tools';
+import { getModifierKey } from '../../utils/platform';
 
 interface InfiniteCanvasProps {
   objects: CanvasObject[];
@@ -63,6 +65,12 @@ export function InfiniteCanvas({
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
   const [resizeStartBounds, setResizeStartBounds] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [resizeStartPoint, setResizeStartPoint] = useState({ x: 0, y: 0 });
+
+  // Selection box state
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
+  const [selectionEnd, setSelectionEnd] = useState({ x: 0, y: 0 });
+  const [selectionBox, setSelectionBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   // Handle mouse wheel zoom
   const handleWheel = useCallback((event: WheelEvent) => {
@@ -151,10 +159,21 @@ export function InfiniteCanvas({
         });
         setOriginalObjectPositions(originalPositions);
       } else {
-        // Clicked on empty space - clear selection
-        if (onObjectClick) {
-          onObjectClick('', event);
+        // Clicked on empty space - start selection box or clear selection
+        if (event.ctrlKey || event.metaKey) {
+          // Don't clear selection if holding Ctrl/Cmd
+        } else {
+          // Clear selection
+          if (onObjectClick) {
+            onObjectClick('', event);
+          }
         }
+        
+        // Start selection box
+        setIsSelecting(true);
+        setSelectionStart(worldPos);
+        setSelectionEnd(worldPos);
+        setSelectionBox({ x: worldPos.x, y: worldPos.y, width: 0, height: 0 });
       }
     }
   }, [isSpacePressed, activeTool, isPanning, screenToWorld, selectedIds, objects, onObjectClick]);
@@ -324,6 +343,23 @@ export function InfiniteCanvas({
       return;
     }
 
+    // Handle selection box dragging
+    if (isSelecting && activeTool === 'select') {
+      const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+      setSelectionEnd(worldPos);
+      
+      // Update selection box
+      const box = {
+        x: Math.min(selectionStart.x, worldPos.x),
+        y: Math.min(selectionStart.y, worldPos.y),
+        width: Math.abs(worldPos.x - selectionStart.x),
+        height: Math.abs(worldPos.y - selectionStart.y)
+      };
+      setSelectionBox(box);
+      
+      return;
+    }
+
     // Handle regular shape drawing
     if (isDrawing && activeTool !== 'select' && activeTool !== 'line') {
       const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
@@ -359,7 +395,7 @@ export function InfiniteCanvas({
         setPreviewObject(preview);
       }
     }
-  }, [isPanning, lastPanPoint, viewport.x, viewport.y, panTo, isDrawing, isDrawingLine, isDragging, draggedObjects, dragStartPoint, originalObjectPositions, isResizing, resizeHandle, resizeStartBounds, resizeStartPoint, selectedIds, objects, activeTool, screenToWorld, drawStartPoint, linePoints, onObjectUpdate]);
+  }, [isPanning, lastPanPoint, viewport.x, viewport.y, panTo, isDrawing, isDrawingLine, isSelecting, selectionStart, isDragging, draggedObjects, dragStartPoint, originalObjectPositions, isResizing, resizeHandle, resizeStartBounds, resizeStartPoint, selectedIds, objects, activeTool, screenToWorld, drawStartPoint, linePoints, onObjectUpdate]);
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
@@ -369,6 +405,65 @@ export function InfiniteCanvas({
     setIsResizing(false);
     setResizeHandle(null);
     setResizeStartBounds(null);
+    
+    // Complete selection box
+    if (isSelecting && selectionBox && onObjectClick) {
+      // Find objects that intersect with selection box
+      const selectedObjectIds: string[] = [];
+      objects.forEach(obj => {
+        if (!obj.visible || obj.locked) return;
+        
+        // Check if object intersects with selection box
+        const objRight = obj.bounds.x + obj.bounds.width;
+        const objBottom = obj.bounds.y + obj.bounds.height;
+        const boxRight = selectionBox.x + selectionBox.width;
+        const boxBottom = selectionBox.y + selectionBox.height;
+        
+        const intersects = !(
+          objRight < selectionBox.x ||
+          obj.bounds.x > boxRight ||
+          objBottom < selectionBox.y ||
+          obj.bounds.y > boxBottom
+        );
+        
+        if (intersects) {
+          selectedObjectIds.push(obj.id);
+        }
+      });
+      
+      // Update selection
+      if (selectedObjectIds.length > 0) {
+        // Create a synthetic event for multi-select
+        const syntheticEvent = {
+          ctrlKey: true,
+          metaKey: false,
+          preventDefault: () => {},
+          stopPropagation: () => {}
+        } as React.MouseEvent;
+        
+        // Select all found objects
+        selectedObjectIds.forEach((id, index) => {
+          if (index === 0) {
+            // First object - check if we should add to existing selection or replace
+            const shouldAddToSelection = selectedIds.length > 0;
+            const eventToUse = shouldAddToSelection ? syntheticEvent : ({
+              ctrlKey: false,
+              metaKey: false,
+              preventDefault: () => {},
+              stopPropagation: () => {}
+            } as React.MouseEvent);
+            onObjectClick(id, eventToUse);
+          } else {
+            // Additional objects - always add to selection
+            onObjectClick(id, syntheticEvent);
+          }
+        });
+      }
+    }
+    
+    // Reset selection box state
+    setIsSelecting(false);
+    setSelectionBox(null);
     
     // Complete line drawing
     if (isDrawingLine && linePoints.length > 1 && onObjectCreate) {
@@ -439,7 +534,7 @@ export function InfiniteCanvas({
     setIsDrawingLine(false);
     setLinePoints([]);
     setPreviewObject(null);
-  }, [isDrawing, isDrawingLine, linePoints, previewObject, onObjectCreate, objects.length]);
+  }, [isDrawing, isDrawingLine, isSelecting, linePoints, previewObject, selectionBox, selectedIds, objects, onObjectCreate, onObjectClick]);
 
   // Handle double-click for text editing
   const handleDoubleClick = useCallback((event: React.MouseEvent) => {
@@ -596,6 +691,7 @@ export function InfiniteCanvas({
     if (isPanning || isSpacePressed) return 'grabbing';
     if (isDrawing || isDrawingLine) return 'crosshair';
     if (isDragging) return 'move';
+    if (isSelecting) return 'crosshair';
     if (isResizing) {
       // Return appropriate resize cursor based on handle
       switch (resizeHandle) {
@@ -653,6 +749,13 @@ export function InfiniteCanvas({
         selectedIds={selectedIds}
       />
       
+      {/* Selection Outlines */}
+      <SelectionOutlines
+        objects={objects}
+        selectedIds={selectedIds}
+        viewport={viewport}
+      />
+      
       {/* Canvas Info Overlay - FIXED POSITIONING */}
       <div className="modern-canvas-info absolute top-4 right-4 z-10 pointer-events-none">
         Zoom: {Math.round(viewport.zoom * 100)}%
@@ -660,7 +763,7 @@ export function InfiniteCanvas({
 
       {/* Instructions Overlay - MOVED TO TOP CENTER */}
       <div className="modern-canvas-info absolute top-4 left-1/2 transform -translate-x-1/2 z-10 pointer-events-none">
-        Wheel: Zoom • Middle/Space+drag: Pan • Ctrl+0: Reset
+        Wheel: Zoom • Space+drag: Pan • Drag: Select • V/R/C/T/L: Tools • {getModifierKey()}+C/V: Copy/Paste
       </div>
 
       {/* Text Input Overlay */}
@@ -677,6 +780,23 @@ export function InfiniteCanvas({
           />
         ) : null;
       })()}
+
+      {/* Selection Box */}
+      {isSelecting && selectionBox && selectionBox.width > 0 && selectionBox.height > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            left: (selectionBox.x - viewport.x) * viewport.zoom,
+            top: (selectionBox.y - viewport.y) * viewport.zoom,
+            width: selectionBox.width * viewport.zoom,
+            height: selectionBox.height * viewport.zoom,
+            border: '2px dashed var(--color-accent)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            pointerEvents: 'none',
+            zIndex: 1000
+          }}
+        />
+      )}
 
       {/* Resize Handles for Selected Objects */}
       {activeTool === 'select' && selectedIds.length === 1 && !editingTextId && (() => {
