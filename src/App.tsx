@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { InfiniteCanvas } from './components/Canvas/InfiniteCanvas';
+import { ToolPanel } from './components/Tools/ToolPanel';
+import { PropertyPanel } from './components/Panels/PropertyPanel';
+import { LayerPanel } from './components/Panels/LayerPanel';
 import type { CanvasObject } from './types/objects';
+import type { ToolType } from './types/tools';
 
 function App() {
   const [objects, setObjects] = useState<CanvasObject[]>([
-    // Demo rectangle
+    // Demo rectangle - positioned more centrally with some offset from edges
     {
       id: '1',
       type: 'rectangle',
-      bounds: { x: 100, y: 100, width: 200, height: 150 },
+      bounds: { x: 150, y: 150, width: 200, height: 150 },
       style: {
         fill: '#3b82f6',
         stroke: '#1e40af',
@@ -25,7 +29,7 @@ function App() {
     {
       id: '2',
       type: 'circle',
-      bounds: { x: 350, y: 150, width: 120, height: 120 },
+      bounds: { x: 400, y: 200, width: 120, height: 120 },
       style: {
         fill: '#ef4444',
         stroke: '#dc2626',
@@ -42,13 +46,13 @@ function App() {
     {
       id: '3',
       type: 'text',
-      bounds: { x: 150, y: 300, width: 200, height: 40 },
+      bounds: { x: 200, y: 350, width: 250, height: 40 },
       style: {
         fill: '#059669',
         stroke: 'transparent',
         strokeWidth: 0,
         opacity: 1,
-        fontSize: 20,
+        fontSize: 24,
         fontFamily: 'Arial',
         textAlign: 'left'
       },
@@ -62,6 +66,7 @@ function App() {
   ]);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [activeTool, setActiveTool] = useState<ToolType>('select');
 
   const handleObjectClick = (objectId: string, event: React.MouseEvent) => {
     if (event.ctrlKey || event.metaKey) {
@@ -77,11 +82,63 @@ function App() {
     }
   };
 
+  const selectedObjects = objects.filter(obj => selectedIds.includes(obj.id));
+
+  const handlePropertyChange = (property: string, value: any) => {
+    setObjects(prev => prev.map(obj => {
+      if (selectedIds.includes(obj.id)) {
+        return {
+          ...obj,
+          style: { ...obj.style, [property]: value },
+          isDirty: true
+        };
+      }
+      return obj;
+    }));
+  };
+
+  const handleObjectUpdate = (updatedObject: CanvasObject) => {
+    setObjects(prev => prev.map(obj => 
+      obj.id === updatedObject.id ? updatedObject : obj
+    ));
+  };
+
+  const addNewObject = (type: ToolType) => {
+    if (type === 'select') return;
+
+    const newObject: CanvasObject = {
+      id: `obj-${Date.now()}`,
+      type: type as any,
+      bounds: { 
+        x: 300 + Math.random() * 100, 
+        y: 200 + Math.random() * 100, 
+        width: type === 'text' ? 150 : 100, 
+        height: type === 'text' ? 30 : 100 
+      },
+      style: {
+        fill: type === 'rectangle' ? '#3b82f6' : type === 'circle' ? '#ef4444' : '#059669',
+        stroke: '#1e40af',
+        strokeWidth: 2,
+        opacity: 1,
+        ...(type === 'text' && { fontSize: 16, fontFamily: 'Arial', textAlign: 'left' as const })
+      },
+      transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+      layer: objects.length,
+      visible: true,
+      locked: false,
+      isDirty: false,
+      ...(type === 'text' && { text: 'New Text' })
+    };
+
+    setObjects(prev => [...prev, newObject]);
+    setSelectedIds([newObject.id]);
+  };
+
   return (
-    <div className="w-screen h-screen flex flex-col">
+    <div className="w-screen h-screen flex flex-col overflow-hidden bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between min-h-[64px] flex-shrink-0 shadow-sm">
-        <h1 className="text-2xl font-bold text-gray-900">RadixCanvas</h1>
+      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between min-h-[60px] flex-shrink-0 shadow-sm z-50">
+        <h1 className="text-xl font-bold text-gray-900">RadixCanvas</h1>
         <div className="flex items-center gap-4 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
           <span className="font-medium">Objects: {objects.length}</span>
           <div className="w-px h-4 bg-gray-300"></div>
@@ -89,15 +146,45 @@ function App() {
         </div>
       </header>
 
-      {/* Canvas */}
-      <main className="flex-1 overflow-hidden">
-        <InfiniteCanvas
-          objects={objects}
-          selectedIds={selectedIds}
-          showGrid={true}
-          onObjectClick={handleObjectClick}
-        />
-      </main>
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar - Tools */}
+        <aside className="w-16 bg-white border-r border-gray-200 flex-shrink-0">
+          <ToolPanel 
+            activeTool={activeTool} 
+            onToolChange={setActiveTool}
+            onAddObject={addNewObject}
+          />
+        </aside>
+
+        {/* Canvas Area */}
+        <main className="flex-1 relative overflow-hidden">
+          <InfiniteCanvas
+            objects={objects}
+            selectedIds={selectedIds}
+            showGrid={true}
+            onObjectClick={handleObjectClick}
+          />
+        </main>
+
+        {/* Right Sidebar - Properties & Layers */}
+        <aside className="w-80 bg-white border-l border-gray-200 flex-shrink-0 flex flex-col">
+          <div className="flex-1 overflow-auto">
+            <PropertyPanel 
+              selectedObjects={selectedObjects}
+              onPropertyChange={handlePropertyChange}
+            />
+          </div>
+          <div className="border-t border-gray-200">
+            <LayerPanel 
+              objects={objects}
+              selectedIds={selectedIds}
+              onObjectUpdate={handleObjectUpdate}
+              onSelectionChange={setSelectedIds}
+            />
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

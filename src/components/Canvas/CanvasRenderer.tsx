@@ -16,7 +16,6 @@ export function CanvasRenderer({
   onObjectClick 
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -25,8 +24,11 @@ export function CanvasRenderer({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Get actual canvas size
+    const rect = canvas.getBoundingClientRect();
+    
+    // Clear canvas with proper dimensions
+    ctx.clearRect(0, 0, rect.width, rect.height);
 
     // Set up transformation matrix
     ctx.save();
@@ -37,14 +39,20 @@ export function CanvasRenderer({
     const visibleObjects = objects.filter(obj => {
       if (!obj.visible) return false;
       
-      // Basic viewport culling
+      // Basic viewport culling - simplified for debugging
+      const canvasWidth = rect.width;
+      const canvasHeight = rect.height;
+      
       const screenBounds = {
         left: -viewport.x / viewport.zoom,
         top: -viewport.y / viewport.zoom,
-        right: (-viewport.x + canvas.width) / viewport.zoom,
-        bottom: (-viewport.y + canvas.height) / viewport.zoom
+        right: (-viewport.x + canvasWidth) / viewport.zoom,
+        bottom: (-viewport.y + canvasHeight) / viewport.zoom
       };
 
+      // For debugging, let's render all objects initially
+      return true; // Change this back to proper culling later
+      
       return !(
         obj.bounds.x + obj.bounds.width < screenBounds.left ||
         obj.bounds.x > screenBounds.right ||
@@ -61,29 +69,29 @@ export function CanvasRenderer({
       ctx.save();
       
       // Apply object transform
-      ctx.translate(obj.transform.x, obj.transform.y);
+      ctx.translate(
+        obj.bounds.x + obj.transform.x, 
+        obj.bounds.y + obj.transform.y
+      );
       ctx.rotate(obj.transform.rotation);
       ctx.scale(obj.transform.scaleX, obj.transform.scaleY);
       
       // Set style
       ctx.globalAlpha = obj.style.opacity;
-      ctx.fillStyle = obj.style.fill;
-      ctx.strokeStyle = obj.style.stroke;
-      ctx.lineWidth = obj.style.strokeWidth;
 
       // Render based on type
       switch (obj.type) {
         case 'rectangle':
           ctx.beginPath();
           if (obj.style.cornerRadius && obj.style.cornerRadius > 0) {
-            // Rounded rectangle using arcs
+            // Rounded rectangle
             const radius = Math.min(
               obj.style.cornerRadius,
               obj.bounds.width / 2,
               obj.bounds.height / 2
             );
-            const x = obj.bounds.x;
-            const y = obj.bounds.y;
+            const x = 0;
+            const y = 0;
             const w = obj.bounds.width;
             const h = obj.bounds.height;
             
@@ -98,17 +106,36 @@ export function CanvasRenderer({
             ctx.quadraticCurveTo(x, y, x + radius, y);
             ctx.closePath();
           } else {
-            ctx.rect(obj.bounds.x, obj.bounds.y, obj.bounds.width, obj.bounds.height);
+            ctx.rect(0, 0, obj.bounds.width, obj.bounds.height);
+          }
+          
+          // Fill and stroke
+          if (obj.style.fill !== 'transparent') {
+            ctx.fillStyle = obj.style.fill;
+            ctx.fill();
+          }
+          if (obj.style.strokeWidth > 0 && obj.style.stroke !== 'transparent') {
+            ctx.strokeStyle = obj.style.stroke;
+            ctx.lineWidth = obj.style.strokeWidth;
+            ctx.stroke();
           }
           break;
 
         case 'circle':
           ctx.beginPath();
-          const centerX = obj.bounds.x + obj.bounds.width / 2;
-          const centerY = obj.bounds.y + obj.bounds.height / 2;
           const radiusX = obj.bounds.width / 2;
           const radiusY = obj.bounds.height / 2;
-          ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+          ctx.ellipse(radiusX, radiusY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+          
+          if (obj.style.fill !== 'transparent') {
+            ctx.fillStyle = obj.style.fill;
+            ctx.fill();
+          }
+          if (obj.style.strokeWidth > 0 && obj.style.stroke !== 'transparent') {
+            ctx.strokeStyle = obj.style.stroke;
+            ctx.lineWidth = obj.style.strokeWidth;
+            ctx.stroke();
+          }
           break;
 
         case 'text':
@@ -118,10 +145,13 @@ export function CanvasRenderer({
             ctx.textBaseline = 'top';
             
             if (obj.style.fill !== 'transparent') {
-              ctx.fillText(obj.text, obj.bounds.x, obj.bounds.y);
+              ctx.fillStyle = obj.style.fill;
+              ctx.fillText(obj.text, 0, 0);
             }
-            if (obj.style.strokeWidth > 0) {
-              ctx.strokeText(obj.text, obj.bounds.x, obj.bounds.y);
+            if (obj.style.strokeWidth > 0 && obj.style.stroke !== 'transparent') {
+              ctx.strokeStyle = obj.style.stroke;
+              ctx.lineWidth = obj.style.strokeWidth;
+              ctx.strokeText(obj.text, 0, 0);
             }
           }
           break;
@@ -133,19 +163,13 @@ export function CanvasRenderer({
             for (let i = 1; i < obj.points.length; i++) {
               ctx.lineTo(obj.points[i].x, obj.points[i].y);
             }
-            ctx.stroke();
+            if (obj.style.strokeWidth > 0) {
+              ctx.strokeStyle = obj.style.stroke;
+              ctx.lineWidth = obj.style.strokeWidth;
+              ctx.stroke();
+            }
           }
           break;
-      }
-
-      // Fill and stroke
-      if (obj.type !== 'line' && obj.type !== 'text') {
-        if (obj.style.fill !== 'transparent') {
-          ctx.fill();
-        }
-        if (obj.style.strokeWidth > 0) {
-          ctx.stroke();
-        }
       }
 
       // Highlight selected objects
@@ -153,6 +177,8 @@ export function CanvasRenderer({
         ctx.strokeStyle = '#007bff';
         ctx.lineWidth = 2 / viewport.zoom;
         ctx.setLineDash([5 / viewport.zoom, 5 / viewport.zoom]);
+        ctx.beginPath();
+        ctx.rect(-2, -2, obj.bounds.width + 4, obj.bounds.height + 4);
         ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -169,40 +195,48 @@ export function CanvasRenderer({
     if (!canvas) return;
 
     const resizeCanvas = () => {
+      const container = canvas.parentElement;
+      if (!container) return;
+
       const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
       
+      // Set actual size in memory (scaled for high-DPI devices)
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
       
+      // Set display size (CSS pixels)
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+      
+      // Scale the drawing context so everything draws at the correct size
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.scale(dpr, dpr);
       }
-      
-      canvas.style.width = rect.width + 'px';
-      canvas.style.height = rect.height + 'px';
       
       render();
     };
 
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-    return () => window.removeEventListener('resize', resizeCanvas);
+    
+    // Also trigger on any viewport change
+    const observer = new ResizeObserver(resizeCanvas);
+    if (canvas.parentElement) {
+      observer.observe(canvas.parentElement);
+    }
+
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+      observer.disconnect();
+    };
   }, [render]);
 
   // Render when dependencies change
   useEffect(() => {
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-    }
-    animationRef.current = requestAnimationFrame(render);
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
+    const timeoutId = setTimeout(render, 0);
+    return () => clearTimeout(timeoutId);
   }, [render]);
 
   const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -215,6 +249,8 @@ export function CanvasRenderer({
     const x = (event.clientX - rect.left - viewport.x) / viewport.zoom;
     const y = (event.clientY - rect.top - viewport.y) / viewport.zoom;
 
+    console.log('Click at:', { x, y, viewport }); // Debug log
+
     // Find clicked object (top-most first)
     const sortedObjects = [...objects]
       .filter(obj => obj.visible && !obj.locked)
@@ -226,6 +262,8 @@ export function CanvasRenderer({
         x <= obj.bounds.x + obj.bounds.width &&
         y >= obj.bounds.y &&
         y <= obj.bounds.y + obj.bounds.height;
+
+      console.log('Checking object:', obj.id, { inBounds, objBounds: obj.bounds }); // Debug log
 
       if (inBounds) {
         onObjectClick(obj.id, event);
