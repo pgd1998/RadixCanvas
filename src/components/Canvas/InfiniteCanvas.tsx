@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useViewport } from '../../hooks/useViewport';
 import { GridLayer } from './GridLayer';
 import { CanvasRenderer } from './CanvasRenderer';
+import { TextInput } from '../UI/TextInput';
 import type { CanvasObject } from '../../types/objects';
 import type { ToolType } from '../../types/tools';
 
@@ -12,6 +13,7 @@ interface InfiniteCanvasProps {
   showGrid?: boolean;
   onObjectClick?: (objectId: string, event: React.MouseEvent) => void;
   onObjectCreate?: (object: CanvasObject) => void;
+  onObjectUpdate?: (object: CanvasObject) => void;
   onCanvasAction?: (action: string, data: any) => void;
 }
 
@@ -22,6 +24,7 @@ export function InfiniteCanvas({
   showGrid = true,
   onObjectClick,
   onObjectCreate,
+  onObjectUpdate,
   onCanvasAction
 }: InfiniteCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,6 +39,14 @@ export function InfiniteCanvas({
   const [drawStartPoint, setDrawStartPoint] = useState({ x: 0, y: 0 });
   const [drawCurrentPoint, setDrawCurrentPoint] = useState({ x: 0, y: 0 });
   const [previewObject, setPreviewObject] = useState<CanvasObject | null>(null);
+  
+  // Text editing state
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [textInputValue, setTextInputValue] = useState('');
+  
+  // Line drawing state
+  const [isDrawingLine, setIsDrawingLine] = useState(false);
+  const [linePoints, setLinePoints] = useState<{ x: number; y: number }[]>([]);
 
   // Handle mouse wheel zoom
   const handleWheel = useCallback((event: WheelEvent) => {
@@ -70,9 +81,17 @@ export function InfiniteCanvas({
     if (event.button === 0 && activeTool !== 'select' && !isPanning) {
       event.preventDefault();
       const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
-      setIsDrawing(true);
-      setDrawStartPoint(worldPos);
-      setDrawCurrentPoint(worldPos);
+      
+      if (activeTool === 'line') {
+        // Line drawing - start collecting points
+        setIsDrawingLine(true);
+        setLinePoints([worldPos]);
+      } else {
+        // Regular shape drawing
+        setIsDrawing(true);
+        setDrawStartPoint(worldPos);
+        setDrawCurrentPoint(worldPos);
+      }
     }
   }, [isSpacePressed, activeTool, isPanning, screenToWorld]);
 
@@ -89,8 +108,55 @@ export function InfiniteCanvas({
       return;
     }
 
-    // Handle drawing
-    if (isDrawing && activeTool !== 'select') {
+    // Handle line drawing
+    if (isDrawingLine && activeTool === 'line') {
+      const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+      setLinePoints(prev => [...prev, worldPos]);
+      
+      // Create line preview
+      if (linePoints.length > 0) {
+        const allPoints = [...linePoints, worldPos];
+        const minX = Math.min(...allPoints.map(p => p.x));
+        const minY = Math.min(...allPoints.map(p => p.y));
+        const maxX = Math.max(...allPoints.map(p => p.x));
+        const maxY = Math.max(...allPoints.map(p => p.y));
+        
+        // Convert points to be relative to the bounds origin
+        const relativePoints = allPoints.map(p => ({
+          x: p.x - minX,
+          y: p.y - minY
+        }));
+        
+        const bounds = {
+          x: minX,
+          y: minY,
+          width: Math.max(maxX - minX, 1),
+          height: Math.max(maxY - minY, 1)
+        };
+
+        const preview: CanvasObject = {
+          id: 'preview',
+          type: 'line',
+          bounds,
+          style: {
+            fill: 'transparent',
+            stroke: '#1e40af',
+            strokeWidth: 2,
+            opacity: 0.7
+          },
+          transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+          layer: 999,
+          visible: true,
+          locked: false,
+          isDirty: false,
+          points: relativePoints
+        };
+        setPreviewObject(preview);
+      }
+    }
+
+    // Handle regular shape drawing
+    if (isDrawing && activeTool !== 'select' && activeTool !== 'line') {
       const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
       setDrawCurrentPoint(worldPos);
       
@@ -124,12 +190,51 @@ export function InfiniteCanvas({
         setPreviewObject(preview);
       }
     }
-  }, [isPanning, lastPanPoint, viewport.x, viewport.y, panTo, isDrawing, activeTool, screenToWorld, drawStartPoint]);
+  }, [isPanning, lastPanPoint, viewport.x, viewport.y, panTo, isDrawing, isDrawingLine, activeTool, screenToWorld, drawStartPoint, linePoints]);
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
     
-    // Complete drawing
+    // Complete line drawing
+    if (isDrawingLine && linePoints.length > 1 && onObjectCreate) {
+      const minX = Math.min(...linePoints.map(p => p.x));
+      const minY = Math.min(...linePoints.map(p => p.y));
+      const maxX = Math.max(...linePoints.map(p => p.x));
+      const maxY = Math.max(...linePoints.map(p => p.y));
+      
+      // Convert points to be relative to the bounds origin
+      const relativePoints = linePoints.map(p => ({
+        x: p.x - minX,
+        y: p.y - minY
+      }));
+      
+      const finalLineObject: CanvasObject = {
+        id: `obj-${Date.now()}`,
+        type: 'line',
+        bounds: {
+          x: minX,
+          y: minY,
+          width: Math.max(maxX - minX, 1),
+          height: Math.max(maxY - minY, 1)
+        },
+        style: {
+          fill: 'transparent',
+          stroke: '#1e40af',
+          strokeWidth: 2,
+          opacity: 1
+        },
+        transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+        layer: objects.length,
+        visible: true,
+        locked: false,
+        isDirty: false,
+        points: relativePoints
+      };
+      
+      onObjectCreate(finalLineObject);
+    }
+    
+    // Complete regular shape drawing
     if (isDrawing && previewObject && onObjectCreate) {
       // Create final object with unique ID
       const finalObject: CanvasObject = {
@@ -145,17 +250,75 @@ export function InfiniteCanvas({
       // Only create if object has reasonable size
       if (finalObject.bounds.width > 5 && finalObject.bounds.height > 5) {
         onObjectCreate(finalObject);
+        
+        // For text objects, immediately enter edit mode
+        if (finalObject.type === 'text') {
+          setEditingTextId(finalObject.id);
+          setTextInputValue(finalObject.text || '');
+        }
       }
     }
     
     // Reset drawing state
     setIsDrawing(false);
+    setIsDrawingLine(false);
+    setLinePoints([]);
     setPreviewObject(null);
-  }, [isDrawing, previewObject, onObjectCreate, objects.length]);
+  }, [isDrawing, isDrawingLine, linePoints, previewObject, onObjectCreate, objects.length]);
+
+  // Handle double-click for text editing
+  const handleDoubleClick = useCallback((event: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+    
+    // Find clicked text object
+    const clickedTextObject = objects
+      .filter(obj => obj.type === 'text' && obj.visible && !obj.locked)
+      .sort((a, b) => b.layer - a.layer)
+      .find(obj => 
+        worldPos.x >= obj.bounds.x &&
+        worldPos.x <= obj.bounds.x + obj.bounds.width &&
+        worldPos.y >= obj.bounds.y &&
+        worldPos.y <= obj.bounds.y + obj.bounds.height
+      );
+
+    if (clickedTextObject) {
+      setEditingTextId(clickedTextObject.id);
+      setTextInputValue(clickedTextObject.text || '');
+    }
+  }, [objects, screenToWorld]);
+
+  // Handle text editing completion
+  const handleTextComplete = useCallback(() => {
+    if (editingTextId && onObjectUpdate) {
+      const textObject = objects.find(obj => obj.id === editingTextId);
+      if (textObject) {
+        const updatedObject = {
+          ...textObject,
+          text: textInputValue,
+          isDirty: true
+        };
+        onObjectUpdate(updatedObject);
+      }
+    }
+    setEditingTextId(null);
+    setTextInputValue('');
+  }, [editingTextId, textInputValue, objects, onObjectUpdate]);
+
+  // Handle text editing cancellation
+  const handleTextCancel = useCallback(() => {
+    setEditingTextId(null);
+    setTextInputValue('');
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't handle space when editing text
+      if (editingTextId) return;
+      
       if (event.code === 'Space') {
         event.preventDefault();
         setIsSpacePressed(true);
@@ -200,6 +363,9 @@ export function InfiniteCanvas({
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
+      // Don't handle space when editing text
+      if (editingTextId) return;
+      
       if (event.code === 'Space') {
         setIsSpacePressed(false);
       }
@@ -230,12 +396,13 @@ export function InfiniteCanvas({
 
   const getCursor = () => {
     if (isPanning || isSpacePressed) return 'grabbing';
-    if (isDrawing) return 'crosshair';
+    if (isDrawing || isDrawingLine) return 'crosshair';
     
     switch (activeTool) {
       case 'rectangle':
       case 'circle':
       case 'text':
+      case 'line':
         return 'crosshair';
       case 'select':
       default:
@@ -254,6 +421,7 @@ export function InfiniteCanvas({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
     >
       {/* Grid Layer */}
@@ -276,6 +444,21 @@ export function InfiniteCanvas({
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white rounded px-3 py-1 text-xs z-10 pointer-events-none">
         Wheel: Zoom • Middle/Space+drag: Pan • Ctrl+0: Reset
       </div>
+
+      {/* Text Input Overlay */}
+      {editingTextId && (() => {
+        const textObject = objects.find(obj => obj.id === editingTextId);
+        return textObject ? (
+          <TextInput
+            object={textObject}
+            value={textInputValue}
+            onChange={setTextInputValue}
+            onComplete={handleTextComplete}
+            onCancel={handleTextCancel}
+            viewport={viewport}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }

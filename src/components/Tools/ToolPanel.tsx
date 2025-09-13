@@ -1,6 +1,6 @@
 import React from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { MousePointer, Square, Circle, Type } from 'lucide-react';
+import { MousePointer, Square, Circle, Type, Minus } from 'lucide-react';
 import type { ToolType } from '../../types/tools';
 
 interface ToolPanelProps {
@@ -32,6 +32,12 @@ const tools = [
     name: 'Text',
     icon: Type,
     shortcut: 'T',
+  },
+  {
+    id: 'line' as ToolType,
+    name: 'Line',
+    icon: Minus,
+    shortcut: 'L',
   }
 ];
 

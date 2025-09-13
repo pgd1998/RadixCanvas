@@ -141,6 +141,7 @@ function App() {
             showGrid={true}
             onObjectClick={handleObjectClick}
             onObjectCreate={handleObjectCreate}
+            onObjectUpdate={handleObjectUpdate}
           />
         </main>
 
