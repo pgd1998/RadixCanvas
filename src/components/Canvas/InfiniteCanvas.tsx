@@ -615,12 +615,12 @@ export function InfiniteCanvas({
       />
       
       {/* Canvas Info Overlay - FIXED POSITIONING */}
-      <div className="absolute top-4 right-4 bg-black/80 text-white rounded px-3 py-1 text-xs font-mono z-10 pointer-events-none">
+      <div className="modern-canvas-info absolute top-4 right-4 z-10 pointer-events-none">
         Zoom: {Math.round(viewport.zoom * 100)}%
       </div>
 
       {/* Instructions Overlay - MOVED TO TOP CENTER */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-black/80 text-white rounded px-3 py-1 text-xs z-10 pointer-events-none">
+      <div className="modern-canvas-info absolute top-4 left-1/2 transform -translate-x-1/2 z-10 pointer-events-none">
         Wheel: Zoom • Middle/Space+drag: Pan • Ctrl+0: Reset
       </div>
 

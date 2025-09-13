@@ -60,7 +60,7 @@ export function ResizeHandles({ object, viewport, onResizeStart }: ResizeHandles
       {handles.map((handle) => (
         <div
           key={handle.type}
-          className="absolute bg-white border-2 border-blue-500 rounded-sm pointer-events-auto hover:bg-blue-100 transition-colors"
+          className="modern-resize-handle absolute pointer-events-auto"
           style={{
             left: `${handle.x}px`,
             top: `${handle.y}px`,

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { InfiniteCanvas } from './components/Canvas/InfiniteCanvas';
 import { ToolPanel } from './components/Tools/ToolPanel';
 import { PropertyPanel } from './components/Panels/PropertyPanel';
 import { LayerPanel } from './components/Panels/LayerPanel';
 import type { CanvasObject } from './types/objects';
 import type { ToolType } from './types/tools';
+import './styles/modern.css';
 
 function App() {
   const [objects, setObjects] = useState<CanvasObject[]>([
@@ -109,22 +110,51 @@ function App() {
     // Keep the current tool active for continuous drawing
   };
 
+  // Keyboard event handler for delete functionality
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if Delete or Backspace key is pressed
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        // Only delete if we're not focused on an input element
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement?.tagName === 'INPUT' || 
+                              activeElement?.tagName === 'TEXTAREA' || 
+                              (activeElement as HTMLElement)?.contentEditable === 'true';
+        
+        if (!isInputFocused && selectedIds.length > 0) {
+          event.preventDefault();
+          // Directly perform the deletion logic here to avoid dependency issues
+          setObjects(prev => prev.filter(obj => !selectedIds.includes(obj.id)));
+          setSelectedIds([]);
+        }
+      }
+    };
+
+    // Add event listener to document
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup event listener on component unmount
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedIds]);
+
   return (
-    <div className="w-screen h-screen flex flex-col overflow-hidden bg-gray-50">
+    <div className="modern-app w-screen h-screen flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between min-h-[72px] flex-shrink-0 shadow-sm z-50 gap-6">
-        <h1 className="text-xl font-bold text-gray-900 flex-shrink-0">RadixCanvas</h1>
-        <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 rounded-lg px-4 py-2 min-w-fit flex-shrink-0">
-          <span className="font-medium whitespace-nowrap">Objects: {objects.length}</span>
-          <div className="w-px h-4 bg-gray-300"></div>
-          <span className="font-medium whitespace-nowrap">Selected: {selectedIds.length}</span>
+      <header className="modern-header px-8 py-4 flex items-center justify-between min-h-[72px] flex-shrink-0 z-50 gap-6">
+        <h1 className="flex-shrink-0">RadixCanvas</h1>
+        <div className="modern-stats flex items-center gap-3 min-w-fit flex-shrink-0">
+          <span className="whitespace-nowrap">Objects: {objects.length}</span>
+          <div className="w-px h-4 bg-current opacity-20"></div>
+          <span className="whitespace-nowrap">Selected: {selectedIds.length}</span>
         </div>
       </header>
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Tools */}
-        <aside className="w-16 bg-white border-r border-gray-200 flex-shrink-0">
+        <aside className="modern-sidebar w-16 flex-shrink-0">
           <ToolPanel 
             activeTool={activeTool} 
             onToolChange={setActiveTool}
@@ -145,21 +175,19 @@ function App() {
         </main>
 
         {/* Right Sidebar - Properties & Layers */}
-        <aside className="w-80 bg-white border-l border-gray-200 flex-shrink-0 flex flex-col">
+        <aside className="modern-property-panel w-80 flex-shrink-0 flex flex-col">
           <div className="flex-1 overflow-auto">
             <PropertyPanel 
               selectedObjects={selectedObjects}
               onPropertyChange={handlePropertyChange}
             />
           </div>
-          <div className="border-t border-gray-200">
-            <LayerPanel 
-              objects={objects}
-              selectedIds={selectedIds}
-              onObjectUpdate={handleObjectUpdate}
-              onSelectionChange={setSelectedIds}
-            />
-          </div>
+          <LayerPanel 
+            objects={objects}
+            selectedIds={selectedIds}
+            onObjectUpdate={handleObjectUpdate}
+            onSelectionChange={setSelectedIds}
+          />
         </aside>
       </div>
     </div>

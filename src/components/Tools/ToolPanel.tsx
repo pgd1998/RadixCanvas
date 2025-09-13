@@ -57,13 +57,7 @@ export function ToolPanel({ activeTool, onToolChange }: ToolPanelProps) {
             <Tooltip.Root key={tool.id}>
               <Tooltip.Trigger asChild>
                 <button
-                  className={`
-                    w-12 h-12 rounded-lg flex items-center justify-center transition-colors
-                    ${isActive 
-                      ? 'bg-blue-100 text-blue-700 border border-blue-300' 
-                      : 'bg-white hover:bg-gray-100 border border-gray-200'
-                    }
-                  `}
+                  className={`modern-tool ${isActive ? 'active' : ''}`}
                   onClick={() => handleToolClick(tool.id)}
                 >
                   <Icon size={18} />
@@ -71,15 +65,15 @@ export function ToolPanel({ activeTool, onToolChange }: ToolPanelProps) {
               </Tooltip.Trigger>
               <Tooltip.Portal>
                 <Tooltip.Content
-                  className="bg-gray-900 text-white px-2 py-1 rounded text-sm"
+                  className="modern-tooltip"
                   side="right"
                   sideOffset={8}
                 >
                   {tool.name}
                   {tool.shortcut && (
-                    <span className="ml-2 text-gray-400">({tool.shortcut})</span>
+                    <span style={{ marginLeft: '8px', opacity: 0.7 }}>({tool.shortcut})</span>
                   )}
-                  <Tooltip.Arrow className="fill-gray-900" />
+                  <Tooltip.Arrow className="fill-current" />
                 </Tooltip.Content>
               </Tooltip.Portal>
             </Tooltip.Root>

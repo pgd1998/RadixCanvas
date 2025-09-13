@@ -63,73 +63,69 @@ export function LayerPanel({ objects, selectedIds, onObjectUpdate, onSelectionCh
   };
 
   return (
-    <div className="h-80">
+    <div style={{ height: '320px' }}>
       <Accordion.Root type="single" defaultValue="layers" collapsible>
         <Accordion.Item value="layers">
           <Accordion.Header>
-            <Accordion.Trigger className="flex items-center justify-between w-full px-4 py-3 text-left text-sm font-medium text-gray-900 hover:bg-gray-50 group">
+            <Accordion.Trigger className="modern-accordion-trigger">
               <span>Layers ({objects.length})</span>
               <ChevronDown 
                 size={16} 
-                className="text-gray-400 transition-transform group-data-[state=open]:rotate-180" 
+                className="modern-accordion-chevron" 
+                style={{ color: 'var(--color-text-muted)' }}
               />
             </Accordion.Trigger>
           </Accordion.Header>
-          <Accordion.Content className="px-2 pb-2">
-            <div className="space-y-1 max-h-64 overflow-y-auto">
+          <Accordion.Content className="modern-accordion-content">
+            <div style={{ maxHeight: '256px', overflowY: 'auto' }}>
               {sortedObjects.map((object) => {
                 const isSelected = selectedIds.includes(object.id);
                 
                 return (
                   <div
                     key={object.id}
-                    className={`
-                      group flex items-center gap-2 px-2 py-2 rounded cursor-pointer text-sm
-                      transition-colors
-                      ${isSelected 
-                        ? 'bg-blue-100 text-blue-900 border border-blue-300' 
-                        : 'hover:bg-gray-100 text-gray-700'
-                      }
-                      ${!object.visible ? 'opacity-50' : ''}
-                      ${object.locked ? 'cursor-not-allowed' : ''}
-                    `}
+                    className={`modern-layer-item ${isSelected ? 'selected' : ''}`}
+                    style={{
+                      opacity: !object.visible ? 0.5 : 1,
+                      cursor: object.locked ? 'not-allowed' : 'pointer'
+                    }}
                     onClick={(e) => handleObjectClick(object.id, e)}
                   >
                     {/* Object Icon */}
-                    <span className="text-xs w-4 text-center">
+                    <span style={{ fontSize: '12px', width: '16px', textAlign: 'center' }}>
                       {getObjectIcon(object.type)}
                     </span>
                     
                     {/* Object Name */}
-                    <span className="flex-1 truncate">
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {getObjectName(object)}
                     </span>
                     
                     {/* Controls */}
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="modern-layer-controls">
                       {/* Visibility Toggle */}
                       <button
-                        className="p-1 rounded hover:bg-white/50 transition-colors"
+                        className="modern-layer-control"
                         onClick={(e) => toggleVisibility(object, e)}
                         title={object.visible ? 'Hide' : 'Show'}
                       >
                         {object.visible ? (
-                          <Eye size={12} className="text-gray-600" />
+                          <Eye size={12} style={{ color: 'var(--color-text-secondary)' }} />
                         ) : (
-                          <EyeOff size={12} className="text-gray-400" />
+                          <EyeOff size={12} style={{ color: 'var(--color-text-muted)' }} />
                         )}
                       </button>
                       
                       {/* Lock Toggle */}
                       <button
-                        className="p-1 rounded hover:bg-white/50 transition-colors"
+                        className="modern-layer-control"
                         onClick={(e) => toggleLock(object, e)}
                         title={object.locked ? 'Unlock' : 'Lock'}
                       >
                         {object.locked ? (
-                          <Lock size={12} className="text-red-600" />
+                          <Lock size={12} style={{ color: 'var(--color-error)' }} />
                         ) : (
-                          <Unlock size={12} className="text-gray-600" />
+                          <Unlock size={12} style={{ color: 'var(--color-text-secondary)' }} />
                         )}
                       </button>
                     </div>
@@ -138,7 +134,7 @@ export function LayerPanel({ objects, selectedIds, onObjectUpdate, onSelectionCh
               })}
               
               {objects.length === 0 && (
-                <div className="text-center py-8 text-sm text-gray-500">
+                <div style={{ textAlign: 'center', padding: '32px', fontSize: '13px', color: 'var(--color-text-muted)' }}>
                   No objects yet
                 </div>
               )}
