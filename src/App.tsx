@@ -103,35 +103,11 @@ function App() {
     ));
   };
 
-  const addNewObject = (type: ToolType) => {
-    if (type === 'select') return;
-
-    const newObject: CanvasObject = {
-      id: `obj-${Date.now()}`,
-      type: type as any,
-      bounds: { 
-        x: 300 + Math.random() * 100, 
-        y: 200 + Math.random() * 100, 
-        width: type === 'text' ? 150 : 100, 
-        height: type === 'text' ? 30 : 100 
-      },
-      style: {
-        fill: type === 'rectangle' ? '#3b82f6' : type === 'circle' ? '#ef4444' : '#059669',
-        stroke: '#1e40af',
-        strokeWidth: 2,
-        opacity: 1,
-        ...(type === 'text' && { fontSize: 16, fontFamily: 'Arial', textAlign: 'left' as const })
-      },
-      transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
-      layer: objects.length,
-      visible: true,
-      locked: false,
-      isDirty: false,
-      ...(type === 'text' && { text: 'New Text' })
-    };
-
+  const handleObjectCreate = (newObject: CanvasObject) => {
     setObjects(prev => [...prev, newObject]);
     setSelectedIds([newObject.id]);
+    // Switch back to select tool after creating object
+    setActiveTool('select');
   };
 
   return (
@@ -153,7 +129,6 @@ function App() {
           <ToolPanel 
             activeTool={activeTool} 
             onToolChange={setActiveTool}
-            onAddObject={addNewObject}
           />
         </aside>
 
@@ -162,8 +137,10 @@ function App() {
           <InfiniteCanvas
             objects={objects}
             selectedIds={selectedIds}
+            activeTool={activeTool}
             showGrid={true}
             onObjectClick={handleObjectClick}
+            onObjectCreate={handleObjectCreate}
           />
         </main>
 

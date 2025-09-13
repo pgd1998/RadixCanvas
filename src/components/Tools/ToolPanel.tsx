@@ -6,7 +6,6 @@ import type { ToolType } from '../../types/tools';
 interface ToolPanelProps {
   activeTool: ToolType;
   onToolChange: (tool: ToolType) => void;
-  onAddObject: (type: ToolType) => void;
 }
 
 const tools = [
@@ -36,13 +35,9 @@ const tools = [
   }
 ];
 
-export function ToolPanel({ activeTool, onToolChange, onAddObject }: ToolPanelProps) {
+export function ToolPanel({ activeTool, onToolChange }: ToolPanelProps) {
   const handleToolClick = (toolId: ToolType) => {
     onToolChange(toolId);
-    if (toolId !== 'select') {
-      // Add a new object when selecting a creation tool
-      onAddObject(toolId);
-    }
   };
 
   return (
