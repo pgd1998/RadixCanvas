@@ -492,44 +492,44 @@ function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
 
 ## 🎯 Implementation Roadmap
 
-### Week 1: Foundation
-**Days 1-2: Project Setup**
+### Foundation
+**Project Setup**
 - [ ] Initialize React + TypeScript + Vite project
 - [ ] Install Radix UI components
 - [ ] Set up Tailwind CSS
 - [ ] Create basic project structure
 - [ ] Set up performance monitoring
 
-**Days 3-4: Canvas Foundation**
+**Canvas Foundation**
 - [ ] Implement InfiniteCanvas component
 - [ ] Add pan/zoom functionality
 - [ ] Create basic rendering pipeline
 - [ ] Add grid system
 - [ ] Implement viewport state management
 
-**Days 5-7: Basic Shape Tools**
+**Basic Shape Tools**
 - [ ] Rectangle tool with click-drag
 - [ ] Circle tool with click-drag
 - [ ] Text tool with click-to-add
 - [ ] Tool switching mechanism
 - [ ] Shape preview during creation
 
-### Week 2: Interaction & Polish
-**Days 1-2: Selection System**
+### Interaction & Polish
+**Selection System**
 - [ ] Click to select objects
 - [ ] Multi-selection with drag box
 - [ ] Selection handles and feedback
 - [ ] Drag to move objects
 - [ ] Basic keyboard shortcuts
 
-**Days 3-4: UI Panels**
+**UI Panels**
 - [ ] Layer panel with Radix Accordion
 - [ ] Property panel with Radix controls
 - [ ] Color picker with Radix Popover
 - [ ] Tool selector with Radix Dropdown
 - [ ] Responsive layout
 
-**Days 5-7: Export & Final Polish**
+**Export & Final Polish**
 - [ ] Export dialog with Radix Dialog
 - [ ] PNG/SVG export functionality
 - [ ] Save/load project files
