@@ -2,9 +2,11 @@ import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useViewport } from '../../hooks/useViewport';
 import { GridLayer } from './GridLayer';
 import { CanvasRenderer } from './CanvasRenderer';
+import { ResizeHandles } from './ResizeHandles';
 import { TextInput } from '../UI/TextInput';
 import type { CanvasObject } from '../../types/objects';
 import type { ToolType } from '../../types/tools';
+import type { ResizeHandle } from '../../types/tools';
 
 interface InfiniteCanvasProps {
   objects: CanvasObject[];
@@ -47,6 +49,17 @@ export function InfiniteCanvas({
   // Line drawing state
   const [isDrawingLine, setIsDrawingLine] = useState(false);
   const [linePoints, setLinePoints] = useState<{ x: number; y: number }[]>([]);
+  
+  // Shape dragging state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartPoint, setDragStartPoint] = useState({ x: 0, y: 0 });
+  const [draggedObjects, setDraggedObjects] = useState<CanvasObject[]>([]);
+  
+  // Shape resizing state
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
+  const [resizeStartBounds, setResizeStartBounds] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [resizeStartPoint, setResizeStartPoint] = useState({ x: 0, y: 0 });
 
   // Handle mouse wheel zoom
   const handleWheel = useCallback((event: WheelEvent) => {
@@ -93,7 +106,28 @@ export function InfiniteCanvas({
         setDrawCurrentPoint(worldPos);
       }
     }
-  }, [isSpacePressed, activeTool, isPanning, screenToWorld]);
+
+    // Left mouse button for dragging (when select tool is active and clicking on selected objects)
+    if (event.button === 0 && activeTool === 'select' && !isPanning && selectedIds.length > 0) {
+      const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+      
+      // Check if clicking on any selected object
+      const selectedObjects = objects.filter(obj => selectedIds.includes(obj.id));
+      const clickedSelectedObject = selectedObjects.find(obj => 
+        worldPos.x >= obj.bounds.x &&
+        worldPos.x <= obj.bounds.x + obj.bounds.width &&
+        worldPos.y >= obj.bounds.y &&
+        worldPos.y <= obj.bounds.y + obj.bounds.height
+      );
+
+      if (clickedSelectedObject) {
+        event.preventDefault();
+        setIsDragging(true);
+        setDragStartPoint(worldPos);
+        setDraggedObjects(selectedObjects);
+      }
+    }
+  }, [isSpacePressed, activeTool, isPanning, screenToWorld, selectedIds, objects]);
 
   const handleMouseMove = useCallback((event: React.MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -155,6 +189,110 @@ export function InfiniteCanvas({
       }
     }
 
+    // Handle shape resizing
+    if (isResizing && resizeHandle && resizeStartBounds && selectedIds.length === 1) {
+      const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+      const selectedObject = objects.find(obj => selectedIds.includes(obj.id));
+      
+      if (selectedObject) {
+        const deltaX = worldPos.x - resizeStartPoint.x;
+        const deltaY = worldPos.y - resizeStartPoint.y;
+        
+        let newBounds = { ...resizeStartBounds };
+        
+        // Calculate new bounds based on resize handle
+        switch (resizeHandle) {
+          case 'nw':
+            newBounds.x = resizeStartBounds.x + deltaX;
+            newBounds.y = resizeStartBounds.y + deltaY;
+            newBounds.width = resizeStartBounds.width - deltaX;
+            newBounds.height = resizeStartBounds.height - deltaY;
+            break;
+          case 'ne':
+            newBounds.y = resizeStartBounds.y + deltaY;
+            newBounds.width = resizeStartBounds.width + deltaX;
+            newBounds.height = resizeStartBounds.height - deltaY;
+            break;
+          case 'sw':
+            newBounds.x = resizeStartBounds.x + deltaX;
+            newBounds.width = resizeStartBounds.width - deltaX;
+            newBounds.height = resizeStartBounds.height + deltaY;
+            break;
+          case 'se':
+            newBounds.width = resizeStartBounds.width + deltaX;
+            newBounds.height = resizeStartBounds.height + deltaY;
+            break;
+          case 'n':
+            newBounds.y = resizeStartBounds.y + deltaY;
+            newBounds.height = resizeStartBounds.height - deltaY;
+            break;
+          case 's':
+            newBounds.height = resizeStartBounds.height + deltaY;
+            break;
+          case 'w':
+            newBounds.x = resizeStartBounds.x + deltaX;
+            newBounds.width = resizeStartBounds.width - deltaX;
+            break;
+          case 'e':
+            newBounds.width = resizeStartBounds.width + deltaX;
+            break;
+        }
+        
+        // Enforce minimum size
+        const minSize = 10;
+        if (newBounds.width < minSize) {
+          if (resizeHandle.includes('w')) {
+            newBounds.x = newBounds.x + newBounds.width - minSize;
+          }
+          newBounds.width = minSize;
+        }
+        if (newBounds.height < minSize) {
+          if (resizeHandle.includes('n')) {
+            newBounds.y = newBounds.y + newBounds.height - minSize;
+          }
+          newBounds.height = minSize;
+        }
+        
+        const updatedObject = {
+          ...selectedObject,
+          bounds: newBounds,
+          isDirty: true
+        };
+        
+        if (onObjectUpdate) {
+          onObjectUpdate(updatedObject);
+        }
+      }
+      return;
+    }
+
+    // Handle shape dragging
+    if (isDragging && draggedObjects.length > 0) {
+      const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+      const deltaX = worldPos.x - dragStartPoint.x;
+      const deltaY = worldPos.y - dragStartPoint.y;
+
+      // Update dragged objects positions in real-time
+      draggedObjects.forEach(obj => {
+        const updatedObject = {
+          ...obj,
+          bounds: {
+            ...obj.bounds,
+            x: obj.bounds.x + deltaX,
+            y: obj.bounds.y + deltaY
+          },
+          isDirty: true
+        };
+        if (onObjectUpdate) {
+          onObjectUpdate(updatedObject);
+        }
+      });
+
+      // Update drag start point for next frame
+      setDragStartPoint(worldPos);
+      return;
+    }
+
     // Handle regular shape drawing
     if (isDrawing && activeTool !== 'select' && activeTool !== 'line') {
       const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
@@ -190,10 +328,15 @@ export function InfiniteCanvas({
         setPreviewObject(preview);
       }
     }
-  }, [isPanning, lastPanPoint, viewport.x, viewport.y, panTo, isDrawing, isDrawingLine, activeTool, screenToWorld, drawStartPoint, linePoints]);
+  }, [isPanning, lastPanPoint, viewport.x, viewport.y, panTo, isDrawing, isDrawingLine, isDragging, draggedObjects, dragStartPoint, isResizing, resizeHandle, resizeStartBounds, resizeStartPoint, selectedIds, objects, activeTool, screenToWorld, drawStartPoint, linePoints, onObjectUpdate]);
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
+    setIsDragging(false);
+    setDraggedObjects([]);
+    setIsResizing(false);
+    setResizeHandle(null);
+    setResizeStartBounds(null);
     
     // Complete line drawing
     if (isDrawingLine && linePoints.length > 1 && onObjectCreate) {
@@ -313,6 +456,22 @@ export function InfiniteCanvas({
     setTextInputValue('');
   }, []);
 
+  // Handle resize start
+  const handleResizeStart = useCallback((handle: ResizeHandle, event: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect || selectedIds.length !== 1) return;
+
+    const selectedObject = objects.find(obj => selectedIds.includes(obj.id));
+    if (!selectedObject) return;
+
+    const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+    
+    setIsResizing(true);
+    setResizeHandle(handle.type);
+    setResizeStartPoint(worldPos);
+    setResizeStartBounds(selectedObject.bounds);
+  }, [selectedIds, objects, screenToWorld]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -397,6 +556,26 @@ export function InfiniteCanvas({
   const getCursor = () => {
     if (isPanning || isSpacePressed) return 'grabbing';
     if (isDrawing || isDrawingLine) return 'crosshair';
+    if (isDragging) return 'move';
+    if (isResizing) {
+      // Return appropriate resize cursor based on handle
+      switch (resizeHandle) {
+        case 'nw':
+        case 'se':
+          return 'nw-resize';
+        case 'ne':
+        case 'sw':
+          return 'ne-resize';
+        case 'n':
+        case 's':
+          return 'n-resize';
+        case 'e':
+        case 'w':
+          return 'e-resize';
+        default:
+          return 'default';
+      }
+    }
     
     switch (activeTool) {
       case 'rectangle':
@@ -456,6 +635,18 @@ export function InfiniteCanvas({
             onComplete={handleTextComplete}
             onCancel={handleTextCancel}
             viewport={viewport}
+          />
+        ) : null;
+      })()}
+
+      {/* Resize Handles for Selected Objects */}
+      {activeTool === 'select' && selectedIds.length === 1 && !editingTextId && (() => {
+        const selectedObject = objects.find(obj => selectedIds.includes(obj.id));
+        return selectedObject ? (
+          <ResizeHandles
+            object={selectedObject}
+            viewport={viewport}
+            onResizeStart={handleResizeStart}
           />
         ) : null;
       })()}

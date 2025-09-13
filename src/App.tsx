@@ -106,8 +106,7 @@ function App() {
   const handleObjectCreate = (newObject: CanvasObject) => {
     setObjects(prev => [...prev, newObject]);
     setSelectedIds([newObject.id]);
-    // Switch back to select tool after creating object
-    setActiveTool('select');
+    // Keep the current tool active for continuous drawing
   };
 
   return (
