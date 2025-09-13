@@ -54,6 +54,7 @@ export function InfiniteCanvas({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartPoint, setDragStartPoint] = useState({ x: 0, y: 0 });
   const [draggedObjects, setDraggedObjects] = useState<CanvasObject[]>([]);
+  const [originalObjectPositions, setOriginalObjectPositions] = useState<{ [key: string]: { x: number; y: number } }>({});
   
   // Shape resizing state
   const [isResizing, setIsResizing] = useState(false);
@@ -107,27 +108,54 @@ export function InfiniteCanvas({
       }
     }
 
-    // Left mouse button for dragging (when select tool is active and clicking on selected objects)
-    if (event.button === 0 && activeTool === 'select' && !isPanning && selectedIds.length > 0) {
+    // Left mouse button for dragging (when select tool is active)
+    if (event.button === 0 && activeTool === 'select' && !isPanning) {
       const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
       
-      // Check if clicking on any selected object
-      const selectedObjects = objects.filter(obj => selectedIds.includes(obj.id));
-      const clickedSelectedObject = selectedObjects.find(obj => 
-        worldPos.x >= obj.bounds.x &&
-        worldPos.x <= obj.bounds.x + obj.bounds.width &&
-        worldPos.y >= obj.bounds.y &&
-        worldPos.y <= obj.bounds.y + obj.bounds.height
-      );
+      // Find any clickable object at this position
+      const clickableObjects = objects.filter(obj => obj.visible && !obj.locked);
+      const clickedObject = clickableObjects
+        .sort((a, b) => b.layer - a.layer)
+        .find(obj => 
+          worldPos.x >= obj.bounds.x &&
+          worldPos.x <= obj.bounds.x + obj.bounds.width &&
+          worldPos.y >= obj.bounds.y &&
+          worldPos.y <= obj.bounds.y + obj.bounds.height
+        );
 
-      if (clickedSelectedObject) {
+      if (clickedObject) {
         event.preventDefault();
+        
+        // If clicking on unselected object, select it first
+        if (!selectedIds.includes(clickedObject.id)) {
+          if (onObjectClick) {
+            onObjectClick(clickedObject.id, event);
+          }
+        }
+        
+        // Prepare for dragging (works for both newly selected and already selected objects)
+        const objectsToDrag = selectedIds.includes(clickedObject.id) 
+          ? objects.filter(obj => selectedIds.includes(obj.id))
+          : [clickedObject];
+          
         setIsDragging(true);
         setDragStartPoint(worldPos);
-        setDraggedObjects(selectedObjects);
+        setDraggedObjects(objectsToDrag);
+        
+        // Store original positions
+        const originalPositions: { [key: string]: { x: number; y: number } } = {};
+        objectsToDrag.forEach(obj => {
+          originalPositions[obj.id] = { x: obj.bounds.x, y: obj.bounds.y };
+        });
+        setOriginalObjectPositions(originalPositions);
+      } else {
+        // Clicked on empty space - clear selection
+        if (onObjectClick) {
+          onObjectClick('', event);
+        }
       }
     }
-  }, [isSpacePressed, activeTool, isPanning, screenToWorld, selectedIds, objects]);
+  }, [isSpacePressed, activeTool, isPanning, screenToWorld, selectedIds, objects, onObjectClick]);
 
   const handleMouseMove = useCallback((event: React.MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -272,24 +300,25 @@ export function InfiniteCanvas({
       const deltaX = worldPos.x - dragStartPoint.x;
       const deltaY = worldPos.y - dragStartPoint.y;
 
-      // Update dragged objects positions in real-time
+      // Update dragged objects positions based on original positions
       draggedObjects.forEach(obj => {
-        const updatedObject = {
-          ...obj,
-          bounds: {
-            ...obj.bounds,
-            x: obj.bounds.x + deltaX,
-            y: obj.bounds.y + deltaY
-          },
-          isDirty: true
-        };
-        if (onObjectUpdate) {
-          onObjectUpdate(updatedObject);
+        const originalPos = originalObjectPositions[obj.id];
+        if (originalPos) {
+          const updatedObject = {
+            ...obj,
+            bounds: {
+              ...obj.bounds,
+              x: originalPos.x + deltaX,
+              y: originalPos.y + deltaY
+            },
+            isDirty: true
+          };
+          if (onObjectUpdate) {
+            onObjectUpdate(updatedObject);
+          }
         }
       });
-
-      // Update drag start point for next frame
-      setDragStartPoint(worldPos);
+      
       return;
     }
 
@@ -328,12 +357,13 @@ export function InfiniteCanvas({
         setPreviewObject(preview);
       }
     }
-  }, [isPanning, lastPanPoint, viewport.x, viewport.y, panTo, isDrawing, isDrawingLine, isDragging, draggedObjects, dragStartPoint, isResizing, resizeHandle, resizeStartBounds, resizeStartPoint, selectedIds, objects, activeTool, screenToWorld, drawStartPoint, linePoints, onObjectUpdate]);
+  }, [isPanning, lastPanPoint, viewport.x, viewport.y, panTo, isDrawing, isDrawingLine, isDragging, draggedObjects, dragStartPoint, originalObjectPositions, isResizing, resizeHandle, resizeStartBounds, resizeStartPoint, selectedIds, objects, activeTool, screenToWorld, drawStartPoint, linePoints, onObjectUpdate]);
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
     setIsDragging(false);
     setDraggedObjects([]);
+    setOriginalObjectPositions({});
     setIsResizing(false);
     setResizeHandle(null);
     setResizeStartBounds(null);
@@ -584,6 +614,7 @@ export function InfiniteCanvas({
       case 'line':
         return 'crosshair';
       case 'select':
+        return 'pointer'; // Show pointer cursor for select tool to indicate clickable objects
       default:
         return 'default';
     }
@@ -611,7 +642,6 @@ export function InfiniteCanvas({
         objects={previewObject ? [...objects, previewObject] : objects}
         viewport={viewport}
         selectedIds={selectedIds}
-        onObjectClick={onObjectClick}
       />
       
       {/* Canvas Info Overlay - FIXED POSITIONING */}

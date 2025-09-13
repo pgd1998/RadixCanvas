@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import type { CanvasObject } from '../../types/objects';
 import type { ViewportState } from '../../types/canvas';
 
@@ -6,14 +6,12 @@ interface CanvasRendererProps {
   objects: CanvasObject[];
   viewport: ViewportState;
   selectedIds: string[];
-  onObjectClick?: (objectId: string, event: React.MouseEvent) => void;
 }
 
 export function CanvasRenderer({ 
   objects, 
   viewport, 
-  selectedIds, 
-  onObjectClick 
+  selectedIds
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -39,26 +37,9 @@ export function CanvasRenderer({
     const visibleObjects = objects.filter(obj => {
       if (!obj.visible) return false;
       
-      // Basic viewport culling - simplified for debugging
-      const canvasWidth = rect.width;
-      const canvasHeight = rect.height;
-      
-      const screenBounds = {
-        left: -viewport.x / viewport.zoom,
-        top: -viewport.y / viewport.zoom,
-        right: (-viewport.x + canvasWidth) / viewport.zoom,
-        bottom: (-viewport.y + canvasHeight) / viewport.zoom
-      };
-
       // For debugging, let's render all objects initially
-      return true; // Change this back to proper culling later
-      
-      return !(
-        obj.bounds.x + obj.bounds.width < screenBounds.left ||
-        obj.bounds.x > screenBounds.right ||
-        obj.bounds.y + obj.bounds.height < screenBounds.top ||
-        obj.bounds.y > screenBounds.bottom
-      );
+      // TODO: Re-enable viewport culling for better performance
+      return true;
     });
 
     // Sort by layer for proper z-index
@@ -239,48 +220,12 @@ export function CanvasRenderer({
     return () => clearTimeout(timeoutId);
   }, [render]);
 
-  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!onObjectClick) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = (event.clientX - rect.left - viewport.x) / viewport.zoom;
-    const y = (event.clientY - rect.top - viewport.y) / viewport.zoom;
-
-    console.log('Click at:', { x, y, viewport }); // Debug log
-
-    // Find clicked object (top-most first)
-    const sortedObjects = [...objects]
-      .filter(obj => obj.visible && !obj.locked)
-      .sort((a, b) => b.layer - a.layer);
-
-    for (const obj of sortedObjects) {
-      const inBounds = 
-        x >= obj.bounds.x &&
-        x <= obj.bounds.x + obj.bounds.width &&
-        y >= obj.bounds.y &&
-        y <= obj.bounds.y + obj.bounds.height;
-
-      console.log('Checking object:', obj.id, { inBounds, objBounds: obj.bounds }); // Debug log
-
-      if (inBounds) {
-        onObjectClick(obj.id, event);
-        return;
-      }
-    }
-
-    // No object clicked, clear selection
-    onObjectClick('', event);
-  };
 
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 cursor-crosshair"
-      style={{ zIndex: 2 }}
-      onClick={handleCanvasClick}
+      className="absolute inset-0"
+      style={{ zIndex: 2, pointerEvents: 'none' }}
     />
   );
 }
