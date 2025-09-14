@@ -7,7 +7,7 @@ interface SelectionOutlinesProps {
   viewport: { x: number; y: number; zoom: number };
 }
 
-export function SelectionOutlines({ objects, selectedIds, viewport }: SelectionOutlinesProps) {
+export const SelectionOutlines = React.memo(function SelectionOutlines({ objects, selectedIds, viewport }: SelectionOutlinesProps) {
   const selectedObjects = objects.filter(obj => selectedIds.includes(obj.id));
 
   if (selectedObjects.length === 0) return null;
@@ -55,4 +55,4 @@ export function SelectionOutlines({ objects, selectedIds, viewport }: SelectionO
       )}
     </>
   );
-}
+});

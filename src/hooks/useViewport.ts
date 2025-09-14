@@ -13,7 +13,18 @@ export function useViewport() {
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
   const animationRef = useRef<number | undefined>(undefined);
 
+  // Throttled viewport updates for better performance
+  const lastUpdateTime = useRef(0);
+  
   const updateViewport = useCallback((updates: Partial<ViewportState>) => {
+    const now = performance.now();
+    
+    // Throttle viewport updates during rapid changes (like panning)
+    if (now - lastUpdateTime.current < 16) { // Max 60fps viewport updates
+      return;
+    }
+    
+    lastUpdateTime.current = now;
     setViewport(prev => ({ ...prev, ...updates }));
   }, []);
 

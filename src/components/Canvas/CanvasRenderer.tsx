@@ -1,19 +1,24 @@
-import { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import type { CanvasObject } from '../../types/objects';
 import type { ViewportState } from '../../types/canvas';
+import { performanceMonitor, isObjectInViewport } from '../../utils/performance';
 
 interface CanvasRendererProps {
   objects: CanvasObject[];
   viewport: ViewportState;
   selectedIds: string[];
+  isPanning?: boolean;
 }
 
-export function CanvasRenderer({ 
+export const CanvasRenderer = React.memo(function CanvasRenderer({ 
   objects, 
   viewport, 
-  selectedIds
+  selectedIds,
+  isPanning = false
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const lastRenderTime = useRef(0);
+  const renderRequestId = useRef<number | null>(null);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -21,6 +26,34 @@ export function CanvasRenderer({
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // Adaptive frame limiting based on visible objects and panning state
+    const now = performance.now();
+    const visibleCount = objects.filter(obj => obj.visible).length;
+    
+    // Dynamic frame rate targeting based on load and panning state
+    let targetFrameTime;
+    if (isPanning) {
+      // During panning: prioritize smoothness over frame rate
+      targetFrameTime = visibleCount > 200 ? 20 : 16; // 50fps for 200+, 60fps otherwise
+    } else {
+      // When static: can afford higher quality rendering
+      targetFrameTime = visibleCount > 300 ? 25 : visibleCount > 150 ? 20 : 16; // 40fps/50fps/60fps
+    }
+    
+    if (now - lastRenderTime.current < targetFrameTime) {
+      // Schedule next render
+      if (renderRequestId.current) {
+        cancelAnimationFrame(renderRequestId.current);
+      }
+      renderRequestId.current = requestAnimationFrame(render);
+      return;
+    }
+    
+    lastRenderTime.current = now;
+
+    // Start performance measurement
+    const endRenderMeasurement = performanceMonitor.startRenderMeasurement();
 
     // Get actual canvas size
     const rect = canvas.getBoundingClientRect();
@@ -33,19 +66,46 @@ export function CanvasRenderer({
     ctx.scale(viewport.zoom, viewport.zoom);
     ctx.translate(viewport.x / viewport.zoom, viewport.y / viewport.zoom);
 
-    // Filter visible objects for performance
+    // Smart viewport culling - balance performance and smoothness
     const visibleObjects = objects.filter(obj => {
       if (!obj.visible) return false;
       
-      // For debugging, let's render all objects initially
-      // TODO: Re-enable viewport culling for better performance
-      return true;
+      // Smart culling with adaptive margins based on object count and panning state
+      const objX = obj.bounds.x + obj.transform.x;
+      const objY = obj.bounds.y + obj.transform.y;
+      
+      // Calculate adaptive margins - larger during panning, smaller when static
+      let marginMultiplier;
+      if (isPanning) {
+        // During panning: generous margins to prevent flickering
+        marginMultiplier = objects.length > 200 ? 1.0 : objects.length > 100 ? 0.8 : 0.6;
+      } else {
+        // When static: smaller margins for better performance
+        marginMultiplier = objects.length > 200 ? 0.4 : objects.length > 100 ? 0.3 : 0.2;
+      }
+      
+      const marginX = (rect.width / viewport.zoom) * marginMultiplier;
+      const marginY = (rect.height / viewport.zoom) * marginMultiplier;
+      
+      // Simplified bounds checking for performance
+      const viewLeft = (-viewport.x / viewport.zoom) - marginX;
+      const viewTop = (-viewport.y / viewport.zoom) - marginY;
+      const viewRight = viewLeft + (rect.width / viewport.zoom) + (marginX * 2);
+      const viewBottom = viewTop + (rect.height / viewport.zoom) + (marginY * 2);
+      
+      // Fast AABB intersection test
+      return !(
+        objX + obj.bounds.width < viewLeft ||
+        objX > viewRight ||
+        objY + obj.bounds.height < viewTop ||
+        objY > viewBottom
+      );
     });
 
     // Sort by layer for proper z-index
     visibleObjects.sort((a, b) => a.layer - b.layer);
 
-    // Render each object
+    // Render each object with level-of-detail optimization
     visibleObjects.forEach(obj => {
       ctx.save();
       
@@ -59,10 +119,20 @@ export function CanvasRenderer({
       
       // Set style
       ctx.globalAlpha = obj.style.opacity;
+      
+      // Level-of-detail: Skip detailed rendering for very small objects when zoomed out
+      const screenSize = Math.max(obj.bounds.width * viewport.zoom, obj.bounds.height * viewport.zoom);
+      const isVerySmall = screenSize < 3; // Less than 3 pixels on screen
 
-      // Render based on type
-      switch (obj.type) {
-        case 'rectangle':
+      // Render based on type with LOD optimization
+      if (isVerySmall) {
+        // Simplified rendering for very small objects - just a colored rectangle
+        ctx.fillStyle = obj.style.fill !== 'transparent' ? obj.style.fill : obj.style.stroke;
+        ctx.fillRect(0, 0, obj.bounds.width, obj.bounds.height);
+      } else {
+        // Full detailed rendering for larger objects
+        switch (obj.type) {
+          case 'rectangle':
           ctx.beginPath();
           if (obj.style.cornerRadius && obj.style.cornerRadius > 0) {
             // Rounded rectangle
@@ -151,6 +221,7 @@ export function CanvasRenderer({
             }
           }
           break;
+        }
       }
 
       // Highlight selected objects
@@ -168,6 +239,9 @@ export function CanvasRenderer({
     });
 
     ctx.restore();
+
+    // End performance measurement
+    endRenderMeasurement();
   }, [objects, viewport, selectedIds]);
 
   // Auto-resize canvas
@@ -211,6 +285,9 @@ export function CanvasRenderer({
     return () => {
       window.removeEventListener('resize', resizeCanvas);
       observer.disconnect();
+      if (renderRequestId.current) {
+        cancelAnimationFrame(renderRequestId.current);
+      }
     };
   }, [render]);
 
@@ -228,4 +305,4 @@ export function CanvasRenderer({
       style={{ zIndex: 2, pointerEvents: 'none' }}
     />
   );
-}
+});

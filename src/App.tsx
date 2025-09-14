@@ -4,6 +4,7 @@ import { ToolPanel } from './components/Tools/ToolPanel';
 import { PropertyPanel } from './components/Panels/PropertyPanel';
 import { LayerPanel } from './components/Panels/LayerPanel';
 import { ExportDialog } from './components/Dialogs/ExportDialog';
+import { PerformancePanel } from './components/Debug/PerformancePanel';
 import type { CanvasObject } from './types/objects';
 import type { ToolType } from './types/tools';
 import { Download, Menu } from 'lucide-react';
@@ -104,11 +105,19 @@ function App() {
     }));
   };
 
-  const handleObjectUpdate = (updatedObject: CanvasObject) => {
+  const handleObjectUpdate = useCallback((updatedObject: CanvasObject) => {
     setObjects(prev => prev.map(obj => 
       obj.id === updatedObject.id ? updatedObject : obj
     ));
-  };
+  }, []);
+
+  // Batch update for performance with many objects
+  const handleBatchObjectUpdate = useCallback((updatedObjects: CanvasObject[]) => {
+    setObjects(prev => {
+      const updatedMap = new Map(updatedObjects.map(obj => [obj.id, obj]));
+      return prev.map(obj => updatedMap.get(obj.id) || obj);
+    });
+  }, []);
 
   const handleObjectCreate = (newObject: CanvasObject) => {
     setObjects(prev => [...prev, newObject]);
@@ -221,6 +230,16 @@ function App() {
         setSelectedIds(prev => prev.filter(id => !objectIds.includes(id)));
         break;
     }
+  }, []);
+
+  // Performance testing functions
+  const handleStressTest = useCallback((stressObjects: CanvasObject[]) => {
+    setObjects(prev => [...prev, ...stressObjects]);
+  }, []);
+
+  const handleClearObjects = useCallback(() => {
+    setObjects([]);
+    setSelectedIds([]);
   }, []);
 
   // Keyboard event handler for shortcuts
@@ -394,6 +413,13 @@ function App() {
         selectedIds={selectedIds}
         viewport={viewport}
         onProjectLoad={handleProjectLoad}
+      />
+
+      {/* Performance Monitoring Panel */}
+      <PerformancePanel
+        objectCount={objects.length}
+        onStressTest={handleStressTest}
+        onClearObjects={handleClearObjects}
       />
     </div>
   );
