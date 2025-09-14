@@ -379,53 +379,24 @@ export function InfiniteCanvas({
       const deltaX = worldPos.x - dragStartPoint.x;
       const deltaY = worldPos.y - dragStartPoint.y;
 
-      // OPTIMIZATION: Batch updates for better performance with many objects
-      if (objects.length > 100 && onObjectUpdate) {
-        // For large object counts, batch all updates into a single callback
-        const updatedObjects: CanvasObject[] = [];
-        
-        draggedObjects.forEach(obj => {
-          const originalPos = originalObjectPositions[obj.id];
-          if (originalPos) {
-            updatedObjects.push({
-              ...obj,
-              bounds: {
-                ...obj.bounds,
-                x: originalPos.x + deltaX,
-                y: originalPos.y + deltaY
-              },
-              isDirty: true
-            });
+      // OPTIMIZATION: Use individual updates for smoother dragging
+      draggedObjects.forEach(obj => {
+        const originalPos = originalObjectPositions[obj.id];
+        if (originalPos) {
+          const updatedObject = {
+            ...obj,
+            bounds: {
+              ...obj.bounds,
+              x: originalPos.x + deltaX,
+              y: originalPos.y + deltaY
+            },
+            isDirty: true
+          };
+          if (onObjectUpdate) {
+            onObjectUpdate(updatedObject);
           }
-        });
-        
-        // Single batched update instead of multiple individual updates
-        if (updatedObjects.length > 0) {
-          // Call update for the first object, which should trigger a batch update
-          onObjectUpdate(updatedObjects[0]);
-          // For additional objects, we would need a batch update method
-          // For now, we'll update them individually but throttled
         }
-      } else {
-        // For smaller counts, use individual updates
-        draggedObjects.forEach(obj => {
-          const originalPos = originalObjectPositions[obj.id];
-          if (originalPos) {
-            const updatedObject = {
-              ...obj,
-              bounds: {
-                ...obj.bounds,
-                x: originalPos.x + deltaX,
-                y: originalPos.y + deltaY
-              },
-              isDirty: true
-            };
-            if (onObjectUpdate) {
-              onObjectUpdate(updatedObject);
-            }
-          }
-        });
-      }
+      });
       
       return;
     }
@@ -856,12 +827,13 @@ export function InfiniteCanvas({
       {/* Grid Layer */}
       <GridLayer viewport={viewport} showGrid={showGrid} />
       
-      {/* Canvas Renderer - reverting to working version */}
+      {/* Canvas Renderer - with dragging state for optimization */}
       <CanvasRenderer
         objects={previewObject ? [...objects, previewObject] : objects}
         viewport={viewport}
         selectedIds={selectedIds}
         isPanning={isPanning}
+        isDragging={isDragging}
       />
       
       {/* Selection Outlines */}

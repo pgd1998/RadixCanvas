@@ -8,13 +8,15 @@ interface CanvasRendererProps {
   viewport: ViewportState;
   selectedIds: string[];
   isPanning?: boolean;
+  isDragging?: boolean;
 }
 
 export const CanvasRenderer = React.memo(function CanvasRenderer({ 
   objects, 
   viewport, 
   selectedIds,
-  isPanning = false
+  isPanning = false,
+  isDragging = false
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastRenderTime = useRef(0);
@@ -27,14 +29,14 @@ export const CanvasRenderer = React.memo(function CanvasRenderer({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Adaptive frame limiting based on visible objects and panning state
+    // Adaptive frame limiting based on visible objects and interaction state
     const now = performance.now();
     const visibleCount = objects.filter(obj => obj.visible).length;
     
-    // Dynamic frame rate targeting based on load and panning state
+    // Dynamic frame rate targeting based on load and interaction state
     let targetFrameTime;
-    if (isPanning) {
-      // During panning: prioritize smoothness over frame rate
+    if (isPanning || isDragging) {
+      // During interactions: prioritize smoothness over frame rate
       targetFrameTime = visibleCount > 200 ? 20 : 16; // 50fps for 200+, 60fps otherwise
     } else {
       // When static: can afford higher quality rendering
@@ -74,10 +76,10 @@ export const CanvasRenderer = React.memo(function CanvasRenderer({
       const objX = obj.bounds.x + obj.transform.x;
       const objY = obj.bounds.y + obj.transform.y;
       
-      // Calculate adaptive margins - larger during panning, smaller when static
+      // Calculate adaptive margins - larger during interactions, smaller when static
       let marginMultiplier;
-      if (isPanning) {
-        // During panning: generous margins to prevent flickering
+      if (isPanning || isDragging) {
+        // During panning or dragging: generous margins to prevent flickering
         marginMultiplier = objects.length > 200 ? 1.0 : objects.length > 100 ? 0.8 : 0.6;
       } else {
         // When static: smaller margins for better performance
