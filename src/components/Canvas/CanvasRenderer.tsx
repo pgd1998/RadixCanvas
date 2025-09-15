@@ -29,22 +29,25 @@ export const CanvasRenderer = React.memo(function CanvasRenderer({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Adaptive frame limiting based on visible objects and interaction state
+    // FIXED: Disable frame limiting during dragging to prevent flickering
     const now = performance.now();
     const visibleCount = objects.filter(obj => obj.visible).length;
     
-    // Dynamic frame rate targeting based on load and interaction state
+    // More conservative frame limiting - prioritize smoothness over performance during interactions
     let targetFrameTime;
-    if (isPanning || isDragging) {
-      // During interactions: prioritize smoothness over frame rate
-      targetFrameTime = visibleCount > 200 ? 20 : 16; // 50fps for 200+, 60fps otherwise
+    if (isDragging) {
+      // During dragging: render as fast as possible to prevent flickering
+      targetFrameTime = 8; // ~120fps for smooth dragging
+    } else if (isPanning) {
+      // During panning: moderate throttling
+      targetFrameTime = 16; // 60fps
     } else {
-      // When static: can afford higher quality rendering
-      targetFrameTime = visibleCount > 300 ? 25 : visibleCount > 150 ? 20 : 16; // 40fps/50fps/60fps
+      // When static: can afford some throttling
+      targetFrameTime = visibleCount > 300 ? 25 : visibleCount > 150 ? 20 : 16;
     }
     
-    if (now - lastRenderTime.current < targetFrameTime) {
-      // Schedule next render
+    if (!isDragging && now - lastRenderTime.current < targetFrameTime) {
+      // Only throttle when not dragging
       if (renderRequestId.current) {
         cancelAnimationFrame(renderRequestId.current);
       }
@@ -68,34 +71,47 @@ export const CanvasRenderer = React.memo(function CanvasRenderer({
     ctx.scale(viewport.zoom, viewport.zoom);
     ctx.translate(viewport.x / viewport.zoom, viewport.y / viewport.zoom);
 
-    // Smart viewport culling - balance performance and smoothness
+    // FIXED: Disable aggressive culling during dragging to prevent flickering
     const visibleObjects = objects.filter(obj => {
       if (!obj.visible) return false;
       
-      // Smart culling with adaptive margins based on object count and panning state
+      // During dragging: render more objects to prevent flickering
+      if (isDragging) {
+        // Use much larger margins during dragging
+        const objX = obj.bounds.x + obj.transform.x;
+        const objY = obj.bounds.y + obj.transform.y;
+        
+        const marginX = (rect.width / viewport.zoom) * 2.0; // Extra large margins
+        const marginY = (rect.height / viewport.zoom) * 2.0;
+        
+        const viewLeft = (-viewport.x / viewport.zoom) - marginX;
+        const viewTop = (-viewport.y / viewport.zoom) - marginY;
+        const viewRight = viewLeft + (rect.width / viewport.zoom) + (marginX * 2);
+        const viewBottom = viewTop + (rect.height / viewport.zoom) + (marginY * 2);
+        
+        // Very lenient bounds checking during dragging
+        return !(
+          objX + obj.bounds.width + 100 < viewLeft ||
+          objX - 100 > viewRight ||
+          objY + obj.bounds.height + 100 < viewTop ||
+          objY - 100 > viewBottom
+        );
+      }
+      
+      // Normal culling when not dragging
       const objX = obj.bounds.x + obj.transform.x;
       const objY = obj.bounds.y + obj.transform.y;
       
-      // Calculate adaptive margins - larger during interactions, smaller when static
-      let marginMultiplier;
-      if (isPanning || isDragging) {
-        // During panning or dragging: generous margins to prevent flickering
-        marginMultiplier = objects.length > 200 ? 1.0 : objects.length > 100 ? 0.8 : 0.6;
-      } else {
-        // When static: smaller margins for better performance
-        marginMultiplier = objects.length > 200 ? 0.4 : objects.length > 100 ? 0.3 : 0.2;
-      }
+      let marginMultiplier = isPanning ? 0.8 : 0.3;
       
       const marginX = (rect.width / viewport.zoom) * marginMultiplier;
       const marginY = (rect.height / viewport.zoom) * marginMultiplier;
       
-      // Simplified bounds checking for performance
       const viewLeft = (-viewport.x / viewport.zoom) - marginX;
       const viewTop = (-viewport.y / viewport.zoom) - marginY;
       const viewRight = viewLeft + (rect.width / viewport.zoom) + (marginX * 2);
       const viewBottom = viewTop + (rect.height / viewport.zoom) + (marginY * 2);
       
-      // Fast AABB intersection test
       return !(
         objX + obj.bounds.width < viewLeft ||
         objX > viewRight ||
@@ -122,17 +138,17 @@ export const CanvasRenderer = React.memo(function CanvasRenderer({
       // Set style
       ctx.globalAlpha = obj.style.opacity;
       
-      // Level-of-detail: Skip detailed rendering for very small objects when zoomed out
+      // FIXED: Disable LOD during dragging to maintain visual consistency
       const screenSize = Math.max(obj.bounds.width * viewport.zoom, obj.bounds.height * viewport.zoom);
-      const isVerySmall = screenSize < 3; // Less than 3 pixels on screen
+      const isVerySmall = !isDragging && screenSize < 3; // Only use LOD when not dragging
 
       // Render based on type with LOD optimization
       if (isVerySmall) {
-        // Simplified rendering for very small objects - just a colored rectangle
+        // Simplified rendering for very small objects - but not during dragging
         ctx.fillStyle = obj.style.fill !== 'transparent' ? obj.style.fill : obj.style.stroke;
         ctx.fillRect(0, 0, obj.bounds.width, obj.bounds.height);
       } else {
-        // Full detailed rendering for larger objects
+        // Full detailed rendering
         switch (obj.type) {
           case 'rectangle':
           ctx.beginPath();
@@ -244,7 +260,7 @@ export const CanvasRenderer = React.memo(function CanvasRenderer({
 
     // End performance measurement
     endRenderMeasurement();
-  }, [objects, viewport, selectedIds]);
+  }, [objects, viewport, selectedIds, isPanning, isDragging]);
 
   // Auto-resize canvas
   useEffect(() => {
@@ -293,12 +309,17 @@ export const CanvasRenderer = React.memo(function CanvasRenderer({
     };
   }, [render]);
 
-  // Render when dependencies change
+  // FIXED: Render immediately when dependencies change during dragging
   useEffect(() => {
-    const timeoutId = setTimeout(render, 0);
-    return () => clearTimeout(timeoutId);
-  }, [render]);
-
+    if (isDragging) {
+      // Render immediately during dragging
+      render();
+    } else {
+      // Use timeout for non-dragging scenarios
+      const timeoutId = setTimeout(render, 0);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [render, isDragging]);
 
   return (
     <canvas

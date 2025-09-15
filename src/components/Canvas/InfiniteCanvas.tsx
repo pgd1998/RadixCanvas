@@ -231,257 +231,254 @@ export function InfiniteCanvas({
 
   // Throttled mouse move for better performance
   const handleMouseMoveThrottled = useCallback((event: React.MouseEvent) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
+  const rect = containerRef.current?.getBoundingClientRect();
+  if (!rect) return;
 
-    // Handle panning with performance optimization
-    if (isPanning) {
-      const deltaX = event.clientX - lastPanPoint.x;
-      const deltaY = event.clientY - lastPanPoint.y;
-      
-      // OPTIMIZATION: Skip very tiny movements to reduce updates (reduced threshold)
-      if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) {
-        return;
-      }
-      
-      panTo(viewport.x + deltaX, viewport.y + deltaY, false);
-      setLastPanPoint({ x: event.clientX, y: event.clientY });
+  // Handle panning with minimal throttling to prevent flickering
+  if (isPanning) {
+    const deltaX = event.clientX - lastPanPoint.x;
+    const deltaY = event.clientY - lastPanPoint.y;
+    
+    // FIXED: Reduced threshold for smoother panning
+    if (Math.abs(deltaX) < 0.1 && Math.abs(deltaY) < 0.1) {
       return;
     }
+    
+    panTo(viewport.x + deltaX, viewport.y + deltaY, false);
+    setLastPanPoint({ x: event.clientX, y: event.clientY });
+    return;
+  }
 
-    // Handle line drawing
-    if (isDrawingLine && activeTool === 'line') {
-      const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
-      setLinePoints(prev => [...prev, worldPos]);
+  // Handle line drawing
+  if (isDrawingLine && activeTool === 'line') {
+    const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+    setLinePoints(prev => [...prev, worldPos]);
+    
+    // Create line preview
+    if (linePoints.length > 0) {
+      const allPoints = [...linePoints, worldPos];
+      const minX = Math.min(...allPoints.map(p => p.x));
+      const minY = Math.min(...allPoints.map(p => p.y));
+      const maxX = Math.max(...allPoints.map(p => p.x));
+      const maxY = Math.max(...allPoints.map(p => p.y));
       
-      // Create line preview
-      if (linePoints.length > 0) {
-        const allPoints = [...linePoints, worldPos];
-        const minX = Math.min(...allPoints.map(p => p.x));
-        const minY = Math.min(...allPoints.map(p => p.y));
-        const maxX = Math.max(...allPoints.map(p => p.x));
-        const maxY = Math.max(...allPoints.map(p => p.y));
-        
-        // Convert points to be relative to the bounds origin
-        const relativePoints = allPoints.map(p => ({
-          x: p.x - minX,
-          y: p.y - minY
-        }));
-        
-        const bounds = {
-          x: minX,
-          y: minY,
-          width: Math.max(maxX - minX, 1),
-          height: Math.max(maxY - minY, 1)
-        };
+      // Convert points to be relative to the bounds origin
+      const relativePoints = allPoints.map(p => ({
+        x: p.x - minX,
+        y: p.y - minY
+      }));
+      
+      const bounds = {
+        x: minX,
+        y: minY,
+        width: Math.max(maxX - minX, 1),
+        height: Math.max(maxY - minY, 1)
+      };
 
-        const preview: CanvasObject = {
-          id: 'preview',
-          type: 'line',
-          bounds,
-          style: {
-            fill: 'transparent',
-            stroke: '#1e40af',
-            strokeWidth: 2,
-            opacity: 0.7
-          },
-          transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
-          layer: 999,
-          visible: true,
-          locked: false,
-          isDirty: false,
-          points: relativePoints
-        };
-        setPreviewObject(preview);
+      const preview: CanvasObject = {
+        id: 'preview',
+        type: 'line',
+        bounds,
+        style: {
+          fill: 'transparent',
+          stroke: '#1e40af',
+          strokeWidth: 2,
+          opacity: 0.7
+        },
+        transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+        layer: 999,
+        visible: true,
+        locked: false,
+        isDirty: false,
+        points: relativePoints
+      };
+      setPreviewObject(preview);
+    }
+  }
+
+  // Handle shape resizing
+  if (isResizing && resizeHandle && resizeStartBounds && selectedIds.length === 1) {
+    const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+    const selectedObject = objects.find(obj => selectedIds.includes(obj.id));
+    
+    if (selectedObject) {
+      const deltaX = worldPos.x - resizeStartPoint.x;
+      const deltaY = worldPos.y - resizeStartPoint.y;
+      
+      let newBounds = { ...resizeStartBounds };
+      
+      // Calculate new bounds based on resize handle
+      switch (resizeHandle) {
+        case 'nw':
+          newBounds.x = resizeStartBounds.x + deltaX;
+          newBounds.y = resizeStartBounds.y + deltaY;
+          newBounds.width = resizeStartBounds.width - deltaX;
+          newBounds.height = resizeStartBounds.height - deltaY;
+          break;
+        case 'ne':
+          newBounds.y = resizeStartBounds.y + deltaY;
+          newBounds.width = resizeStartBounds.width + deltaX;
+          newBounds.height = resizeStartBounds.height - deltaY;
+          break;
+        case 'sw':
+          newBounds.x = resizeStartBounds.x + deltaX;
+          newBounds.width = resizeStartBounds.width - deltaX;
+          newBounds.height = resizeStartBounds.height + deltaY;
+          break;
+        case 'se':
+          newBounds.width = resizeStartBounds.width + deltaX;
+          newBounds.height = resizeStartBounds.height + deltaY;
+          break;
+        case 'n':
+          newBounds.y = resizeStartBounds.y + deltaY;
+          newBounds.height = resizeStartBounds.height - deltaY;
+          break;
+        case 's':
+          newBounds.height = resizeStartBounds.height + deltaY;
+          break;
+        case 'w':
+          newBounds.x = resizeStartBounds.x + deltaX;
+          newBounds.width = resizeStartBounds.width - deltaX;
+          break;
+        case 'e':
+          newBounds.width = resizeStartBounds.width + deltaX;
+          break;
+      }
+      
+      // Enforce minimum size
+      const minSize = 10;
+      if (newBounds.width < minSize) {
+        if (resizeHandle.includes('w')) {
+          newBounds.x = newBounds.x + newBounds.width - minSize;
+        }
+        newBounds.width = minSize;
+      }
+      if (newBounds.height < minSize) {
+        if (resizeHandle.includes('n')) {
+          newBounds.y = newBounds.y + newBounds.height - minSize;
+        }
+        newBounds.height = minSize;
+      }
+      
+      const updatedObject = {
+        ...selectedObject,
+        bounds: newBounds,
+        isDirty: true
+      };
+      
+      if (onObjectUpdate) {
+        onObjectUpdate(updatedObject);
       }
     }
+    return;
+  }
 
-    // Handle shape resizing
-    if (isResizing && resizeHandle && resizeStartBounds && selectedIds.length === 1) {
-      const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
-      const selectedObject = objects.find(obj => selectedIds.includes(obj.id));
-      
-      if (selectedObject) {
-        const deltaX = worldPos.x - resizeStartPoint.x;
-        const deltaY = worldPos.y - resizeStartPoint.y;
-        
-        let newBounds = { ...resizeStartBounds };
-        
-        // Calculate new bounds based on resize handle
-        switch (resizeHandle) {
-          case 'nw':
-            newBounds.x = resizeStartBounds.x + deltaX;
-            newBounds.y = resizeStartBounds.y + deltaY;
-            newBounds.width = resizeStartBounds.width - deltaX;
-            newBounds.height = resizeStartBounds.height - deltaY;
-            break;
-          case 'ne':
-            newBounds.y = resizeStartBounds.y + deltaY;
-            newBounds.width = resizeStartBounds.width + deltaX;
-            newBounds.height = resizeStartBounds.height - deltaY;
-            break;
-          case 'sw':
-            newBounds.x = resizeStartBounds.x + deltaX;
-            newBounds.width = resizeStartBounds.width - deltaX;
-            newBounds.height = resizeStartBounds.height + deltaY;
-            break;
-          case 'se':
-            newBounds.width = resizeStartBounds.width + deltaX;
-            newBounds.height = resizeStartBounds.height + deltaY;
-            break;
-          case 'n':
-            newBounds.y = resizeStartBounds.y + deltaY;
-            newBounds.height = resizeStartBounds.height - deltaY;
-            break;
-          case 's':
-            newBounds.height = resizeStartBounds.height + deltaY;
-            break;
-          case 'w':
-            newBounds.x = resizeStartBounds.x + deltaX;
-            newBounds.width = resizeStartBounds.width - deltaX;
-            break;
-          case 'e':
-            newBounds.width = resizeStartBounds.width + deltaX;
-            break;
-        }
-        
-        // Enforce minimum size
-        const minSize = 10;
-        if (newBounds.width < minSize) {
-          if (resizeHandle.includes('w')) {
-            newBounds.x = newBounds.x + newBounds.width - minSize;
-          }
-          newBounds.width = minSize;
-        }
-        if (newBounds.height < minSize) {
-          if (resizeHandle.includes('n')) {
-            newBounds.y = newBounds.y + newBounds.height - minSize;
-          }
-          newBounds.height = minSize;
-        }
-        
+  // FIXED: Improved shape dragging with immediate updates and no throttling
+  if (isDragging && draggedObjects.length > 0) {
+    const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+    const deltaX = worldPos.x - dragStartPoint.x;
+    const deltaY = worldPos.y - dragStartPoint.y;
+
+    // FIXED: Use immediate updates during dragging to prevent flickering
+    draggedObjects.forEach(obj => {
+      const originalPos = originalObjectPositions[obj.id];
+      if (originalPos) {
         const updatedObject = {
-          ...selectedObject,
-          bounds: newBounds,
+          ...obj,
+          bounds: {
+            ...obj.bounds,
+            x: originalPos.x + deltaX,
+            y: originalPos.y + deltaY
+          },
           isDirty: true
         };
-        
         if (onObjectUpdate) {
           onObjectUpdate(updatedObject);
         }
       }
-      return;
-    }
+    });
+    
+    return;
+  }
 
-    // Handle shape dragging with batched updates for performance
-    if (isDragging && draggedObjects.length > 0) {
-      const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
-      const deltaX = worldPos.x - dragStartPoint.x;
-      const deltaY = worldPos.y - dragStartPoint.y;
+  // Handle selection box dragging
+  if (isSelecting && activeTool === 'select') {
+    const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+    setSelectionEnd(worldPos);
+    
+    // Update selection box
+    const box = {
+      x: Math.min(selectionStart.x, worldPos.x),
+      y: Math.min(selectionStart.y, worldPos.y),
+      width: Math.abs(worldPos.x - selectionStart.x),
+      height: Math.abs(worldPos.y - selectionStart.y)
+    };
+    setSelectionBox(box);
+    
+    return;
+  }
 
-      // OPTIMIZATION: Use individual updates for smoother dragging
-      draggedObjects.forEach(obj => {
-        const originalPos = originalObjectPositions[obj.id];
-        if (originalPos) {
-          const updatedObject = {
-            ...obj,
-            bounds: {
-              ...obj.bounds,
-              x: originalPos.x + deltaX,
-              y: originalPos.y + deltaY
-            },
-            isDirty: true
-          };
-          if (onObjectUpdate) {
-            onObjectUpdate(updatedObject);
-          }
-        }
-      });
-      
-      return;
-    }
+  // Handle regular shape drawing
+  if (isDrawing && activeTool !== 'select' && activeTool !== 'line') {
+    const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+    setDrawCurrentPoint(worldPos);
+    
+    // Update preview object
+    const bounds = {
+      x: Math.min(drawStartPoint.x, worldPos.x),
+      y: Math.min(drawStartPoint.y, worldPos.y),
+      width: Math.abs(worldPos.x - drawStartPoint.x),
+      height: Math.abs(worldPos.y - drawStartPoint.x)
+    };
 
-    // Handle selection box dragging
-    if (isSelecting && activeTool === 'select') {
-      const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
-      setSelectionEnd(worldPos);
-      
-      // Update selection box
-      const box = {
-        x: Math.min(selectionStart.x, worldPos.x),
-        y: Math.min(selectionStart.y, worldPos.y),
-        width: Math.abs(worldPos.x - selectionStart.x),
-        height: Math.abs(worldPos.y - selectionStart.y)
+    if (bounds.width > 1 && bounds.height > 1) {
+      const preview: CanvasObject = {
+        id: 'preview',
+        type: activeTool as any,
+        bounds,
+        style: {
+          fill: activeTool === 'rectangle' ? '#3b82f6' : activeTool === 'circle' ? '#ef4444' : '#059669',
+          stroke: '#1e40af',
+          strokeWidth: 2,
+          opacity: 0.5,
+          ...(activeTool === 'text' && { fontSize: 16, fontFamily: 'Arial', textAlign: 'left' as const })
+        },
+        transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+        layer: 999,
+        visible: true,
+        locked: false,
+        isDirty: false,
+        ...(activeTool === 'text' && { text: 'New Text' })
       };
-      setSelectionBox(box);
-      
-      return;
+      setPreviewObject(preview);
     }
+  }
+}, [isPanning, lastPanPoint, viewport.x, viewport.y, panTo, isDrawing, isDrawingLine, isSelecting, selectionStart, isDragging, draggedObjects, dragStartPoint, originalObjectPositions, isResizing, resizeHandle, resizeStartBounds, resizeStartPoint, selectedIds, objects, activeTool, screenToWorld, drawStartPoint, linePoints, onObjectUpdate]);
 
-    // Handle regular shape drawing
-    if (isDrawing && activeTool !== 'select' && activeTool !== 'line') {
-      const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
-      setDrawCurrentPoint(worldPos);
-      
-      // Update preview object
-      const bounds = {
-        x: Math.min(drawStartPoint.x, worldPos.x),
-        y: Math.min(drawStartPoint.y, worldPos.y),
-        width: Math.abs(worldPos.x - drawStartPoint.x),
-        height: Math.abs(worldPos.y - drawStartPoint.y)
-      };
+// FIXED: Minimal throttling approach - only throttle non-critical operations
+const lastMoveTime = useRef(0);
 
-      if (bounds.width > 1 && bounds.height > 1) {
-        const preview: CanvasObject = {
-          id: 'preview',
-          type: activeTool as any,
-          bounds,
-          style: {
-            fill: activeTool === 'rectangle' ? '#3b82f6' : activeTool === 'circle' ? '#ef4444' : '#059669',
-            stroke: '#1e40af',
-            strokeWidth: 2,
-            opacity: 0.5,
-            ...(activeTool === 'text' && { fontSize: 16, fontFamily: 'Arial', textAlign: 'left' as const })
-          },
-          transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
-          layer: 999,
-          visible: true,
-          locked: false,
-          isDirty: false,
-          ...(activeTool === 'text' && { text: 'New Text' })
-        };
-        setPreviewObject(preview);
-      }
-    }
-  }, [isPanning, lastPanPoint, viewport.x, viewport.y, panTo, isDrawing, isDrawingLine, isSelecting, selectionStart, isDragging, draggedObjects, dragStartPoint, originalObjectPositions, isResizing, resizeHandle, resizeStartBounds, resizeStartPoint, selectedIds, objects, activeTool, screenToWorld, drawStartPoint, linePoints, onObjectUpdate]);
-
-  // Aggressive throttling for panning operations
-  const lastMoveTime = useRef(0);
-  const lastPanTime = useRef(0);
+const handleMouseMove = useCallback((event: React.MouseEvent) => {
+  const now = performance.now();
   
-  const handleMouseMove = useCallback((event: React.MouseEvent) => {
-    const now = performance.now();
-    
-    // Smart throttling for panning - adapt based on object count
-    if (isPanning && objects.length > 200) {
-      // Light throttling only for very large counts
-      const panDelay = objects.length > 400 ? 20 : 16; // 50fps for 400+, 60fps otherwise
-      if (now - lastPanTime.current < panDelay) {
-        return; // Skip this pan update
-      }
-      lastPanTime.current = now;
-    } else {
-      // Normal throttling for other interactions
-      const delay = getThrottleDelay();
-      if (now - lastMoveTime.current < delay) {
-        return;
-      }
-      lastMoveTime.current = now;
-    }
-    
+  // FIXED: No throttling during dragging to prevent flickering
+  if (isDragging) {
     handleMouseMoveThrottled(event);
-  }, [isPanning, objects.length, getThrottleDelay, handleMouseMoveThrottled]);
+    return;
+  }
 
+  // Light throttling for other operations
+  if (isPanning && objects.length > 200) {
+    // Only throttle panning when there are many objects
+    const panDelay = 16; // 60fps max
+    if (now - lastMoveTime.current < panDelay) {
+      return;
+    }
+    lastMoveTime.current = now;
+  }
+  
+  handleMouseMoveThrottled(event);
+}, [isDragging, isPanning, objects.length, handleMouseMoveThrottled]);
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
     setIsDragging(false);
