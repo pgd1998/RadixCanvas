@@ -3,6 +3,8 @@ import { useViewport } from '../../hooks/useViewport';
 import { GridLayer } from './GridLayer';
 import { CanvasRenderer } from './CanvasRenderer';
 import { UltraPerformanceRenderer } from './UltraPerformanceRenderer';
+import { AdvancedCanvasRenderer } from './AdvancedCanvasRenderer';
+import { MemoryOptimizedRenderer } from './MemoryOptimizedRenderer';
 import { ResizeHandles } from './ResizeHandles';
 import { SelectionOutlines } from './SelectionOutlines';
 import { TextInput } from '../UI/TextInput';
@@ -824,8 +826,8 @@ const handleMouseMove = useCallback((event: React.MouseEvent) => {
       {/* Grid Layer */}
       <GridLayer viewport={viewport} showGrid={showGrid} />
       
-      {/* Canvas Renderer - with dragging state for optimization */}
-      <CanvasRenderer
+      {/* Memory Optimized Renderer - targeting <50MB memory usage */}
+      <MemoryOptimizedRenderer
         objects={previewObject ? [...objects, previewObject] : objects}
         viewport={viewport}
         selectedIds={selectedIds}
@@ -833,12 +835,7 @@ const handleMouseMove = useCallback((event: React.MouseEvent) => {
         isDragging={isDragging}
       />
       
-      {/* Selection Outlines */}
-      <SelectionOutlines
-        objects={objects}
-        selectedIds={selectedIds}
-        viewport={viewport}
-      />
+      {/* Selection outlines now handled in MemoryOptimizedRenderer */}
       
       {/* Canvas Info Overlay - FIXED POSITIONING */}
       <div className="modern-canvas-info absolute top-4 right-4 z-10 pointer-events-none">
