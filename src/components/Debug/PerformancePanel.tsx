@@ -52,17 +52,35 @@ export function PerformancePanel({ objectCount, onStressTest, onClearObjects }: 
           height: '48px',
           borderRadius: '50%',
           background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border-light)',
+          border: '2px solid var(--color-accent)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
           zIndex: 1000,
-          transition: 'all var(--transition-fast)'
+          transition: 'all var(--transition-fast)',
+          animation: 'pulse 2s infinite',
+          boxShadow: '0 0 0 0 rgba(99, 102, 241, 0.4)'
         }}
-        title="Open Performance Monitor"
+        title="🚀 Performance Monitor - Click to see 60+ FPS!"
       >
-        <Activity size={20} color="var(--color-text-secondary)" />
+        <Activity size={20} color="var(--color-accent)" />
+        <style>{`
+          @keyframes pulse {
+            0% {
+              transform: scale(1);
+              box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+            }
+            50% {
+              transform: scale(1.05);
+              box-shadow: 0 0 0 8px rgba(99, 102, 241, 0);
+            }
+            100% {
+              transform: scale(1);
+              box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+            }
+          }
+        `}</style>
       </button>
     );
   }

@@ -19,9 +19,11 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tailwindcss/postcss": "^4.1.13",
+    "@types/stats.js": "^0.17.4",
     "lucide-react": "^0.544.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "stats.js": "^0.17.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",

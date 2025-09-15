@@ -9,66 +9,11 @@ import type { CanvasObject } from './types/objects';
 import type { ToolType } from './types/tools';
 import { Download, Menu } from 'lucide-react';
 import { isModifierPressed } from './utils/platform';
+import { fpsVerifier } from './utils/fpsVerification';
 import './styles/modern.css';
 
 function App() {
-  const [objects, setObjects] = useState<CanvasObject[]>([
-    // Demo rectangle - positioned more centrally with some offset from edges
-    {
-      id: '1',
-      type: 'rectangle',
-      bounds: { x: 150, y: 150, width: 200, height: 150 },
-      style: {
-        fill: '#3b82f6',
-        stroke: '#1e40af',
-        strokeWidth: 2,
-        opacity: 1
-      },
-      transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
-      layer: 0,
-      visible: true,
-      locked: false,
-      isDirty: false
-    },
-    // Demo circle
-    {
-      id: '2',
-      type: 'circle',
-      bounds: { x: 400, y: 200, width: 120, height: 120 },
-      style: {
-        fill: '#ef4444',
-        stroke: '#dc2626',
-        strokeWidth: 2,
-        opacity: 1
-      },
-      transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
-      layer: 1,
-      visible: true,
-      locked: false,
-      isDirty: false
-    },
-    // Demo text
-    {
-      id: '3',
-      type: 'text',
-      bounds: { x: 200, y: 350, width: 250, height: 40 },
-      style: {
-        fill: '#059669',
-        stroke: 'transparent',
-        strokeWidth: 0,
-        opacity: 1,
-        fontSize: 24,
-        fontFamily: 'Arial',
-        textAlign: 'left'
-      },
-      transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
-      layer: 2,
-      visible: true,
-      locked: false,
-      isDirty: false,
-      text: 'Hello RadixCanvas!'
-    }
-  ]);
+  const [objects, setObjects] = useState<CanvasObject[]>([]);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTool, setActiveTool] = useState<ToolType>('select');
@@ -111,13 +56,6 @@ function App() {
     ));
   }, []);
 
-  // Batch update for performance with many objects
-  const handleBatchObjectUpdate = useCallback((updatedObjects: CanvasObject[]) => {
-    setObjects(prev => {
-      const updatedMap = new Map(updatedObjects.map(obj => [obj.id, obj]));
-      return prev.map(obj => updatedMap.get(obj.id) || obj);
-    });
-  }, []);
 
   const handleObjectCreate = (newObject: CanvasObject) => {
     setObjects(prev => [...prev, newObject]);
@@ -142,7 +80,7 @@ function App() {
     if (clipboard.length > 0) {
       const pastedObjects = clipboard.map(obj => ({
         ...obj,
-        id: `obj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `obj-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
         bounds: {
           ...obj.bounds,
           x: obj.bounds.x + 20, // Offset pasted objects
@@ -240,6 +178,15 @@ function App() {
   const handleClearObjects = useCallback(() => {
     setObjects([]);
     setSelectedIds([]);
+  }, []);
+
+  // Start FPS verification on app mount (temporary for testing)
+  useEffect(() => {
+    fpsVerifier.start();
+    console.log('🔍 FPS Verification started - check console for cross-check values');
+    return () => {
+      // Cleanup if needed
+    };
   }, []);
 
   // Keyboard event handler for shortcuts

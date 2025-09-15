@@ -15,6 +15,7 @@ export interface PerformanceMetrics {
 export class PerformanceMonitor {
   private frameCount = 0;
   private lastTime = performance.now();
+  private lastUpdate = performance.now();
   private frameTimeSum = 0;
   private renderTimeSum = 0;
   private renderTimeCount = 0;
@@ -42,17 +43,19 @@ export class PerformanceMonitor {
     
     this.frameCount++;
     this.frameTimeSum += deltaTime;
+    this.lastTime = now;
 
     // Update metrics every 500ms for more responsive monitoring
-    if (deltaTime >= 500) {
-      this.metrics.fps = Math.round((this.frameCount * 1000) / deltaTime);
+    const elapsedTime = now - this.lastUpdate;
+    if (elapsedTime >= 500) {
+      this.metrics.fps = Math.round((this.frameCount * 1000) / elapsedTime);
       this.metrics.frameTime = this.frameTimeSum / this.frameCount;
       this.metrics.lastUpdate = now;
 
-      // Reset counters
+      // Reset counters for next measurement period
       this.frameCount = 0;
       this.frameTimeSum = 0;
-      this.lastTime = now;
+      this.lastUpdate = now;
 
       this.notifySubscribers();
     }
