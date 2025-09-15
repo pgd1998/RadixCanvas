@@ -1,4 +1,3 @@
-import React from 'react';
 import * as Slider from '@radix-ui/react-slider';
 import { EnhancedColorPicker } from '../UI/EnhancedColorPicker';
 import type { CanvasObject } from '../../types/objects';

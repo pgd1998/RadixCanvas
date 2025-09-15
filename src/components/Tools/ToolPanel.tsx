@@ -1,4 +1,3 @@
-import React from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { MousePointer, Square, Circle, Type, Minus } from 'lucide-react';
 import type { ToolType } from '../../types/tools';

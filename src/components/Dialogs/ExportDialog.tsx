@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as RadioGroup from '@radix-ui/react-radio-group';
 import { Download, X, Image, FileCode, Save, Upload } from 'lucide-react';
@@ -34,7 +34,7 @@ export function ExportDialog({
   const [pngQuality, setPngQuality] = useState(90);
   const [exportScale, setExportScale] = useState(1);
   const [backgroundColor, setBackgroundColor] = useState('transparent');
-  const [customDimensions, setCustomDimensions] = useState({ enabled: false, width: 1920, height: 1080 });
+  const [customDimensions] = useState({ enabled: false, width: 1920, height: 1080 });
   const [projectName, setProjectName] = useState('My Design');
   const [isExporting, setIsExporting] = useState(false);
 
@@ -188,9 +188,6 @@ export function ExportDialog({
                   padding: 'var(--spacing-sm)',
                   borderRadius: 'var(--radius-md)',
                   transition: 'background-color var(--transition-fast)',
-                  ':hover': {
-                    backgroundColor: 'var(--color-bg-tertiary)'
-                  }
                 }}
                 onClick={() => setExportFormat('png')}
               >

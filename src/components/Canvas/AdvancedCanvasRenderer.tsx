@@ -52,9 +52,7 @@ export const AdvancedCanvasRenderer = React.memo(function AdvancedCanvasRenderer
   );
   const lastQuadTreeUpdate = useRef(0);
   
-  // Dirty rectangle tracking
-  const dirtyRegions = useRef<Array<{x: number, y: number, width: number, height: number}>>([]);
-  const lastObjectStates = useRef(new Map<string, string>());
+  // Performance optimization complete
   
   // Context state pooling
   const contextStatePool = useRef({

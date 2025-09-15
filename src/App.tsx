@@ -7,9 +7,8 @@ import { ExportDialog } from './components/Dialogs/ExportDialog';
 import { PerformancePanel } from './components/Debug/PerformancePanel';
 import type { CanvasObject } from './types/objects';
 import type { ToolType } from './types/tools';
-import { Download, Menu } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { isModifierPressed } from './utils/platform';
-import { fpsVerifier } from './utils/fpsVerification';
 import './styles/modern.css';
 
 function App() {
@@ -180,14 +179,6 @@ function App() {
     setSelectedIds([]);
   }, []);
 
-  // Start FPS verification on app mount (temporary for testing)
-  useEffect(() => {
-    fpsVerifier.start();
-    console.log('🔍 FPS Verification started - check console for cross-check values');
-    return () => {
-      // Cleanup if needed
-    };
-  }, []);
 
   // Keyboard event handler for shortcuts
   useEffect(() => {

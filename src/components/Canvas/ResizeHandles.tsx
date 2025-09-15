@@ -40,7 +40,7 @@ export function ResizeHandles({ object, viewport, onResizeStart }: ResizeHandles
   const handles: ResizeHandle[] = worldHandles.map(handle => {
     const screenPos = worldToScreen(handle.worldX, handle.worldY);
     return {
-      type: handle.type,
+      type: handle.type as ResizeHandle['type'],
       x: screenPos.x - handleOffset,
       y: screenPos.y - handleOffset,
       cursor: handle.cursor

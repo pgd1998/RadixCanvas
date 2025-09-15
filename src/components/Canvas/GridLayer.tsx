@@ -1,4 +1,4 @@
-import React from 'react';
+import type { JSX } from 'react';
 import type { ViewportState } from '../../types/canvas';
 
 interface GridLayerProps {

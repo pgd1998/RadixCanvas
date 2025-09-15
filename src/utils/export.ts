@@ -278,7 +278,7 @@ ${svgContent}
  */
 export function exportToPNG(
   objects: CanvasObject[],
-  options: ExportOptions = {}
+  options: ExportOptions = { format: 'png' }
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
     try {
@@ -307,7 +307,7 @@ export function exportToPNG(
  */
 export function exportToSVG(
   objects: CanvasObject[],
-  options: ExportOptions = {}
+  options: ExportOptions = { format: 'svg' }
 ): Promise<Blob> {
   return new Promise((resolve) => {
     const bounds = options.customDimensions 

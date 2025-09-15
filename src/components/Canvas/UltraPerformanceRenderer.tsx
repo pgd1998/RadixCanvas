@@ -1,8 +1,8 @@
-import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useCallback, useMemo } from 'react';
 import type { CanvasObject } from '../../types/objects';
 import type { ViewportState } from '../../types/canvas';
 import { performanceMonitor } from '../../utils/performance';
-import { QuadTree } from '../../utils/quadtree';
+// import { QuadTree } from '../../utils/quadtree';
 
 interface UltraPerformanceRendererProps {
   objects: CanvasObject[];
@@ -18,11 +18,10 @@ interface UltraPerformanceRendererProps {
  * - Zero-allocation render loops
  * - Advanced dirty rectangle tracking
  */
-export const UltraPerformanceRenderer = React.memo(function UltraPerformanceRenderer({
+export function UltraPerformanceRenderer({
   objects,
   viewport,
-  selectedIds,
-  isPanning = false
+  selectedIds
 }: UltraPerformanceRendererProps) {
   // Multi-canvas architecture
   const containerRef = useRef<HTMLDivElement>(null);
@@ -39,19 +38,8 @@ export const UltraPerformanceRenderer = React.memo(function UltraPerformanceRend
   const pathCache = useRef(new Map<string, Path2D>());
   const pathCacheKeys = useRef(new Set<string>());
   
-  // Spatial indexing with QuadTree
-  const quadTree = useRef<QuadTree>(
-    new QuadTree({ x: -10000, y: -10000, width: 20000, height: 20000 }, 8, 12)
-  );
-  const lastObjectCount = useRef(0);
-  
-  // Dirty region tracking
-  const dirtyRegions = useRef<Array<{x: number, y: number, width: number, height: number}>>([]);
-  const lastObjectStates = useRef(new Map<string, string>());
-  
-  // Object pooling for zero-allocation
-  const tempPoint = useRef({x: 0, y: 0});
-  const tempRect = useRef({x: 0, y: 0, width: 0, height: 0});
+  // Path cache size limit
+  const MAX_CACHE_SIZE = 1000;
   
   // Layer separation logic - simplified for debugging
   const { staticObjects, dynamicObjects } = useMemo(() => {
@@ -112,18 +100,19 @@ export const UltraPerformanceRenderer = React.memo(function UltraPerformanceRend
     pathCacheKeys.current.add(key);
     
     // Limit cache size to prevent memory bloat
-    if (pathCacheKeys.current.size > 1000) {
+    if (pathCacheKeys.current.size > MAX_CACHE_SIZE) {
       const firstKey = pathCacheKeys.current.values().next().value;
-      pathCache.current.delete(firstKey);
-      pathCacheKeys.current.delete(firstKey);
+      if (firstKey) {
+        pathCache.current.delete(firstKey);
+        pathCacheKeys.current.delete(firstKey);
+      }
     }
     
     return path;
   }, [generatePathKey]);
   
-  // Simplified viewport culling for debugging
-  const cullObjects = useCallback((objectList: CanvasObject[], rect: DOMRect) => {
-    // For debugging: render all objects for now
+  // Simplified viewport culling
+  const cullObjects = useCallback((objectList: CanvasObject[]) => {
     return objectList.filter(obj => obj.visible);
   }, []);
   
@@ -221,7 +210,7 @@ export const UltraPerformanceRenderer = React.memo(function UltraPerformanceRend
     ctx.translate(viewport.x / viewport.zoom, viewport.y / viewport.zoom);
     
     // Render static objects
-    const visibleStatic = cullObjects(staticObjects, rect);
+    const visibleStatic = cullObjects(staticObjects);
     visibleStatic.sort((a, b) => a.layer - b.layer);
     
     visibleStatic.forEach(obj => renderObject(ctx, obj, true));
@@ -248,7 +237,7 @@ export const UltraPerformanceRenderer = React.memo(function UltraPerformanceRend
     ctx.translate(viewport.x / viewport.zoom, viewport.y / viewport.zoom);
     
     // Render dynamic objects
-    const visibleDynamic = cullObjects(dynamicObjects, rect);
+    const visibleDynamic = cullObjects(dynamicObjects);
     visibleDynamic.sort((a, b) => a.layer - b.layer);
     
     visibleDynamic.forEach(obj => renderObject(ctx, obj, false)); // No caching for dynamic objects
@@ -398,4 +387,4 @@ export const UltraPerformanceRenderer = React.memo(function UltraPerformanceRend
       />
     </div>
   );
-});
+}

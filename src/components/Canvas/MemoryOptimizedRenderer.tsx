@@ -34,7 +34,7 @@ export const MemoryOptimizedRenderer = React.memo(function MemoryOptimizedRender
   
   // Memory-efficient object pools (reused, never garbage collected)
   const tempBounds = useRef({ x: 0, y: 0, width: 0, height: 0 });
-  const tempPoint = useRef({ x: 0, y: 0 });
+  // Memory optimization pools
   const selectedSet = useRef(new Set<string>());
   
   

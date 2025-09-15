@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import type { CanvasObject } from '../../types/objects';
 import type { ViewportState } from '../../types/canvas';
-import { performanceMonitor, isObjectInViewport } from '../../utils/performance';
+import { performanceMonitor } from '../../utils/performance';
 
 interface CanvasRendererProps {
   objects: CanvasObject[];
@@ -11,7 +11,7 @@ interface CanvasRendererProps {
   isDragging?: boolean;
 }
 
-export const CanvasRenderer = React.memo(function CanvasRenderer({ 
+export function CanvasRenderer({ 
   objects, 
   viewport, 
   selectedIds,
@@ -328,4 +328,4 @@ export const CanvasRenderer = React.memo(function CanvasRenderer({
       style={{ zIndex: 2, pointerEvents: 'none' }}
     />
   );
-});
+}

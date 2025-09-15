@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { performanceMonitor, createStressTestObjects, type PerformanceMetrics } from '../../utils/performance';
 import { Activity, Zap, HardDrive, Layers, Clock, TestTube } from 'lucide-react';
 
@@ -18,7 +18,9 @@ export function PerformancePanel({ objectCount, onStressTest, onClearObjects }: 
 
   useEffect(() => {
     const unsubscribe = performanceMonitor.subscribe(setMetrics);
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const getStatusColor = (value: number, goodThreshold: number, okThreshold: number) => {

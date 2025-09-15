@@ -29,18 +29,18 @@ export const OptimizedCanvas = React.memo(function OptimizedCanvas({
     }
     
     const draggedIds = new Set(draggedObjects.map(obj => obj.id));
-    const static: CanvasObject[] = [];
-    const dynamic: CanvasObject[] = [];
+    const staticObjects: CanvasObject[] = [];
+    const dynamicObjects: CanvasObject[] = [];
     
     objects.forEach(obj => {
       if (draggedIds.has(obj.id)) {
-        dynamic.push(obj);
+        dynamicObjects.push(obj);
       } else {
-        static.push(obj);
+        staticObjects.push(obj);
       }
     });
     
-    return { staticObjects: static, dynamicObjects: dynamic };
+    return { staticObjects, dynamicObjects };
   }, [objects, isDragging, draggedObjects]);
 
   // Render static objects (only when they change)

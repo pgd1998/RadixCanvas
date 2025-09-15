@@ -1,18 +1,14 @@
-import React, { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { useViewport } from '../../hooks/useViewport';
 import { GridLayer } from './GridLayer';
-import { CanvasRenderer } from './CanvasRenderer';
-import { UltraPerformanceRenderer } from './UltraPerformanceRenderer';
-import { AdvancedCanvasRenderer } from './AdvancedCanvasRenderer';
 import { HighPerformanceRenderer } from './HighPerformanceRenderer';
 import { ResizeHandles } from './ResizeHandles';
-import { SelectionOutlines } from './SelectionOutlines';
 import { TextInput } from '../UI/TextInput';
 import type { CanvasObject } from '../../types/objects';
 import type { ToolType } from '../../types/tools';
 import type { ResizeHandle } from '../../types/tools';
 import { getModifierKey } from '../../utils/platform';
-import { throttle, usePerformanceOptimization, isObjectInViewport } from '../../utils/performance';
+import { usePerformanceOptimization } from '../../utils/performance';
 
 interface InfiniteCanvasProps {
   objects: CanvasObject[];
@@ -22,7 +18,6 @@ interface InfiniteCanvasProps {
   onObjectClick?: (objectId: string, event: React.MouseEvent) => void;
   onObjectCreate?: (object: CanvasObject) => void;
   onObjectUpdate?: (object: CanvasObject) => void;
-  onCanvasAction?: (action: string, data: any) => void;
   onViewportChange?: (viewport: { x: number; y: number; zoom: number }) => void;
 }
 
@@ -34,7 +29,6 @@ export function InfiniteCanvas({
   onObjectClick,
   onObjectCreate,
   onObjectUpdate,
-  onCanvasAction,
   onViewportChange
 }: InfiniteCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -51,7 +45,6 @@ export function InfiniteCanvas({
   // Drawing state
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStartPoint, setDrawStartPoint] = useState({ x: 0, y: 0 });
-  const [drawCurrentPoint, setDrawCurrentPoint] = useState({ x: 0, y: 0 });
   const [previewObject, setPreviewObject] = useState<CanvasObject | null>(null);
   
   // Text editing state
@@ -77,7 +70,6 @@ export function InfiniteCanvas({
   // Selection box state
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
-  const [selectionEnd, setSelectionEnd] = useState({ x: 0, y: 0 });
   const [selectionBox, setSelectionBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   // Handle mouse wheel zoom
@@ -127,7 +119,6 @@ export function InfiniteCanvas({
         // Regular shape drawing
         setIsDrawing(true);
         setDrawStartPoint(worldPos);
-        setDrawCurrentPoint(worldPos);
       }
     }
 
@@ -153,13 +144,7 @@ export function InfiniteCanvas({
         // If no selected object clicked, check visible objects in viewport
         if (!clickedObject) {
           const visibleObjects = objects.filter(obj => 
-            obj.visible && !obj.locked &&
-            isObjectInViewport({
-              x: obj.bounds.x + obj.transform.x,
-              y: obj.bounds.y + obj.transform.y,
-              width: obj.bounds.width,
-              height: obj.bounds.height
-            }, viewport, { width: rect.width, height: rect.height })
+            obj.visible && !obj.locked
           );
           
           clickedObject = visibleObjects
@@ -223,7 +208,6 @@ export function InfiniteCanvas({
         // Start selection box
         setIsSelecting(true);
         setSelectionStart(worldPos);
-        setSelectionEnd(worldPos);
         setSelectionBox({ x: worldPos.x, y: worldPos.y, width: 0, height: 0 });
       }
     }
@@ -237,11 +221,6 @@ export function InfiniteCanvas({
   }, [activeTool, showWelcome]);
 
   // Performance-based throttling for large object counts
-  const getThrottleDelay = useCallback(() => {
-    if (objects.length > 300) return 20; // 50fps for 300+ objects
-    if (objects.length > 200) return 16; // 60fps for 200+ objects
-    return 16; // 60fps for smaller counts
-  }, [objects.length]);
 
   // Throttled mouse move for better performance
   const handleMouseMoveThrottled = useCallback((event: React.MouseEvent) => {
@@ -418,7 +397,7 @@ export function InfiniteCanvas({
   // Handle selection box dragging
   if (isSelecting && activeTool === 'select') {
     const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
-    setSelectionEnd(worldPos);
+    // removed(worldPos);
     
     // Update selection box
     const box = {
@@ -435,7 +414,7 @@ export function InfiniteCanvas({
   // Handle regular shape drawing
   if (isDrawing && activeTool !== 'select' && activeTool !== 'line') {
     const worldPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
-    setDrawCurrentPoint(worldPos);
+    // removed(worldPos);
     
     // Update preview object
     const bounds = {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import * as Tabs from '@radix-ui/react-tabs';
 import { ColorWheel } from './ColorWheel';
