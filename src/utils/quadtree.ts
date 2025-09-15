@@ -23,7 +23,7 @@ export class QuadTree {
   private readonly maxObjects: number;
   private readonly maxLevels: number;
   
-  constructor(bounds: Rectangle, maxObjects = 10, maxLevels = 10) {
+  constructor(bounds: Rectangle, maxObjects = 8, maxLevels = 12) {
     this.maxObjects = maxObjects;
     this.maxLevels = maxLevels;
     this.root = {

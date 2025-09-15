@@ -43,8 +43,8 @@ export class PerformanceMonitor {
     this.frameCount++;
     this.frameTimeSum += deltaTime;
 
-    // Update metrics every second
-    if (deltaTime >= 1000) {
+    // Update metrics every 500ms for more responsive monitoring
+    if (deltaTime >= 500) {
       this.metrics.fps = Math.round((this.frameCount * 1000) / deltaTime);
       this.metrics.frameTime = this.frameTimeSum / this.frameCount;
       this.metrics.lastUpdate = now;
@@ -98,7 +98,7 @@ export class PerformanceMonitor {
 
   // Check if performance is below targets
   isPerformancePoor(): boolean {
-    return this.metrics.fps < 45 || this.metrics.renderTime > 20;
+    return this.metrics.fps < 60 || this.metrics.renderTime > 16;
   }
 
   private notifySubscribers() {
@@ -114,7 +114,7 @@ export function throttle<T extends (...args: any[]) => any>(
   func: T,
   limit: number
 ): T {
-  let lastFunc: NodeJS.Timeout;
+  let lastFunc: number;
   let lastRan: number;
   
   return ((...args: any[]) => {
@@ -123,7 +123,7 @@ export function throttle<T extends (...args: any[]) => any>(
       lastRan = Date.now();
     } else {
       clearTimeout(lastFunc);
-      lastFunc = setTimeout(() => {
+      lastFunc = window.setTimeout(() => {
         if (Date.now() - lastRan >= limit) {
           func.apply(null, args);
           lastRan = Date.now();
@@ -138,11 +138,11 @@ export function debounce<T extends (...args: any[]) => any>(
   func: T,
   delay: number
 ): T {
-  let timeoutId: NodeJS.Timeout;
+  let timeoutId: number;
   
   return ((...args: any[]) => {
     clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(null, args), delay);
+    timeoutId = window.setTimeout(() => func.apply(null, args), delay);
   }) as T;
 }
 
@@ -225,18 +225,38 @@ export function usePerformanceOptimization() {
   return performanceMonitor;
 }
 
-// Stress testing utility
+// Stress testing utility optimized for performance testing
 export function createStressTestObjects(count: number): any[] {
   const objects = [];
   const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
-  const types = ['rectangle', 'circle', 'text', 'line'];
+  const types = ['rectangle', 'circle', 'text'];
+  
+  // Create a mix of object sizes for realistic performance testing
+  const sizeMix = [
+    { min: 20, max: 50, ratio: 0.6 },   // Small objects (60%)
+    { min: 50, max: 150, ratio: 0.3 },  // Medium objects (30%) 
+    { min: 150, max: 300, ratio: 0.1 }  // Large objects (10%)
+  ];
   
   for (let i = 0; i < count; i++) {
     const type = types[Math.floor(Math.random() * types.length)];
-    const x = Math.random() * 2000;
-    const y = Math.random() * 2000;
-    const width = 50 + Math.random() * 100;
-    const height = 50 + Math.random() * 100;
+    const x = Math.random() * 4000 - 2000; // Spread over larger area
+    const y = Math.random() * 4000 - 2000;
+    
+    // Realistic size distribution
+    const rand = Math.random();
+    let sizeCategory = sizeMix[0];
+    let acc = 0;
+    for (const cat of sizeMix) {
+      acc += cat.ratio;
+      if (rand <= acc) {
+        sizeCategory = cat;
+        break;
+      }
+    }
+    
+    const width = sizeCategory.min + Math.random() * (sizeCategory.max - sizeCategory.min);
+    const height = sizeCategory.min + Math.random() * (sizeCategory.max - sizeCategory.min);
     
     objects.push({
       id: `stress-${i}`,
@@ -245,17 +265,70 @@ export function createStressTestObjects(count: number): any[] {
       style: {
         fill: colors[Math.floor(Math.random() * colors.length)],
         stroke: '#000000',
-        strokeWidth: 1,
-        opacity: 0.7 + Math.random() * 0.3
+        strokeWidth: Math.random() > 0.7 ? 2 : 0, // 30% have stroke
+        opacity: 0.8 + Math.random() * 0.2,
+        ...(type === 'text' && { 
+          fontSize: 12 + Math.random() * 24,
+          fontFamily: 'Arial',
+          textAlign: 'left' as const
+        })
       },
       transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
-      layer: i,
+      layer: i % 100, // Distribute across 100 layers
       visible: true,
       locked: false,
       isDirty: false,
-      ...(type === 'text' && { text: `Object ${i}` })
+      ...(type === 'text' && { text: `Obj ${i}` })
     });
   }
   
   return objects;
+}
+
+// Performance benchmark utility
+export function benchmarkRenderer(_renderer: string, _objectCount: number, duration: number = 5000): Promise<{
+  avgFPS: number;
+  minFPS: number;
+  maxFPS: number;
+  avgRenderTime: number;
+  totalFrames: number;
+}> {
+  return new Promise((resolve) => {
+    const startTime = performance.now();
+    const metrics: number[] = [];
+    const renderTimes: number[] = [];
+    let frameCount = 0;
+    
+    const measureLoop = () => {
+      const now = performance.now();
+      if (now - startTime < duration) {
+        performanceMonitor.measureFrame();
+        const current = performanceMonitor.getMetrics();
+        
+        if (current.fps > 0) {
+          metrics.push(current.fps);
+          renderTimes.push(current.renderTime);
+          frameCount++;
+        }
+        
+        requestAnimationFrame(measureLoop);
+      } else {
+        // Calculate results
+        const avgFPS = metrics.reduce((a, b) => a + b, 0) / metrics.length;
+        const minFPS = Math.min(...metrics);
+        const maxFPS = Math.max(...metrics);
+        const avgRenderTime = renderTimes.reduce((a, b) => a + b, 0) / renderTimes.length;
+        
+        resolve({
+          avgFPS: Math.round(avgFPS),
+          minFPS,
+          maxFPS,
+          avgRenderTime: Math.round(avgRenderTime * 100) / 100,
+          totalFrames: frameCount
+        });
+      }
+    };
+    
+    measureLoop();
+  });
 }

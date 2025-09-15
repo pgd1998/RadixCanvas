@@ -117,11 +117,11 @@ export function PerformancePanel({ objectCount, onStressTest, onClearObjects }: 
       <div style={{ display: 'grid', gap: 'var(--spacing-sm)' }}>
         {/* FPS */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-          <Zap size={14} color={getStatusColor(metrics?.fps || 0, 55, 45)} />
+          <Zap size={14} color={getStatusColor(metrics?.fps || 0, 60, 45)} />
           <span style={{ flex: 1 }}>FPS:</span>
           <span style={{ 
             fontWeight: 600, 
-            color: getStatusColor(metrics?.fps || 0, 55, 45) 
+            color: getStatusColor(metrics?.fps || 0, 60, 45) 
           }}>
             {metrics?.fps || 0}
           </span>
@@ -278,7 +278,7 @@ export function PerformancePanel({ objectCount, onStressTest, onClearObjects }: 
         color: 'var(--color-text-muted)',
         fontStyle: 'italic'
       }}>
-        Target: 60+ FPS, &lt;20ms render, &lt;100MB memory
+        Target: 60+ FPS, &lt;16ms render, &lt;100MB memory
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { GridLayer } from './GridLayer';
 import { CanvasRenderer } from './CanvasRenderer';
 import { UltraPerformanceRenderer } from './UltraPerformanceRenderer';
 import { AdvancedCanvasRenderer } from './AdvancedCanvasRenderer';
-import { MemoryOptimizedRenderer } from './MemoryOptimizedRenderer';
+import { HighPerformanceRenderer } from './HighPerformanceRenderer';
 import { ResizeHandles } from './ResizeHandles';
 import { SelectionOutlines } from './SelectionOutlines';
 import { TextInput } from '../UI/TextInput';
@@ -826,8 +826,8 @@ const handleMouseMove = useCallback((event: React.MouseEvent) => {
       {/* Grid Layer */}
       <GridLayer viewport={viewport} showGrid={showGrid} />
       
-      {/* Memory Optimized Renderer - targeting <50MB memory usage */}
-      <MemoryOptimizedRenderer
+      {/* High Performance Renderer - targeting 125+ FPS */}
+      <HighPerformanceRenderer
         objects={previewObject ? [...objects, previewObject] : objects}
         viewport={viewport}
         selectedIds={selectedIds}
