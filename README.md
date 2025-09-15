@@ -240,7 +240,3 @@ This project was built to demonstrate advanced frontend performance optimization
 - **Performance monitoring and optimization** workflows
 
 ---
-
-**Built with ❤️ for design engineering excellence**
-
-*Contact: [your-email@example.com](mailto:your-email@example.com)*
