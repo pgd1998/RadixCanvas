@@ -220,7 +220,7 @@ const objectPool = new ObjectPool(() => createObject(), obj => resetObject(obj))
 
 ## 🎪 Live Demo
 
-**[View Live Demo](https://your-demo-url.com)**
+**[View Live Demo](https://optimised-canvas.vercel.app/)**
 
 Test the performance yourself:
 1. Use the **Performance Panel** to monitor real-time FPS
