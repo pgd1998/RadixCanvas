@@ -355,9 +355,17 @@ function App() {
           </button>
         </div>
         <div className="modern-stats flex items-center gap-3 min-w-fit flex-shrink-0">
-          <span className="whitespace-nowrap">Objects: {objects.length}</span>
-          <div className="w-px h-4 bg-current opacity-20"></div>
-          <span className="whitespace-nowrap">Selected: {selectedIds.length}</span>
+          {objects.length === 0 ? (
+            <span className="whitespace-nowrap text-sm" style={{ color: 'var(--color-text-muted)' }}>
+              🎨 Start by selecting a tool from the left sidebar
+            </span>
+          ) : (
+            <>
+              <span className="whitespace-nowrap">Objects: {objects.length}</span>
+              <div className="w-px h-4 bg-current opacity-20"></div>
+              <span className="whitespace-nowrap">Selected: {selectedIds.length}</span>
+            </>
+          )}
         </div>
       </header>
 

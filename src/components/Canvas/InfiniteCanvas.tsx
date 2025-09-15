@@ -46,7 +46,7 @@ export function InfiniteCanvas({
   const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
-  const [isAnimatingViewport, setIsAnimatingViewport] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
   
   // Drawing state
   const [isDrawing, setIsDrawing] = useState(false);
@@ -100,6 +100,11 @@ export function InfiniteCanvas({
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
+    
+    // Hide welcome overlay on first interaction
+    if (showWelcome) {
+      setShowWelcome(false);
+    }
 
     // Middle mouse button or space + left mouse button for panning
     if (event.button === 1 || (event.button === 0 && isSpacePressed)) {
@@ -222,7 +227,14 @@ export function InfiniteCanvas({
         setSelectionBox({ x: worldPos.x, y: worldPos.y, width: 0, height: 0 });
       }
     }
-  }, [isSpacePressed, activeTool, isPanning, screenToWorld, selectedIds, objects, onObjectClick]);
+  }, [isSpacePressed, activeTool, isPanning, screenToWorld, selectedIds, objects, onObjectClick, showWelcome, setShowWelcome]);
+  
+  // Hide welcome overlay when user changes tools
+  useEffect(() => {
+    if (activeTool !== 'select' && showWelcome) {
+      setShowWelcome(false);
+    }
+  }, [activeTool, showWelcome]);
 
   // Performance-based throttling for large object counts
   const getThrottleDelay = useCallback(() => {
@@ -430,30 +442,29 @@ export function InfiniteCanvas({
       x: Math.min(drawStartPoint.x, worldPos.x),
       y: Math.min(drawStartPoint.y, worldPos.y),
       width: Math.abs(worldPos.x - drawStartPoint.x),
-      height: Math.abs(worldPos.y - drawStartPoint.x)
+      height: Math.abs(worldPos.y - drawStartPoint.y)
     };
 
-    if (bounds.width > 1 && bounds.height > 1) {
-      const preview: CanvasObject = {
-        id: 'preview',
-        type: activeTool as any,
-        bounds,
-        style: {
-          fill: activeTool === 'rectangle' ? '#3b82f6' : activeTool === 'circle' ? '#ef4444' : '#059669',
-          stroke: '#1e40af',
-          strokeWidth: 2,
-          opacity: 0.5,
-          ...(activeTool === 'text' && { fontSize: 16, fontFamily: 'Arial', textAlign: 'left' as const })
-        },
-        transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
-        layer: 999,
-        visible: true,
-        locked: false,
-        isDirty: false,
-        ...(activeTool === 'text' && { text: 'New Text' })
-      };
-      setPreviewObject(preview);
-    }
+    // Always create preview object, even for tiny sizes
+    const preview: CanvasObject = {
+      id: 'preview',
+      type: activeTool as any,
+      bounds,
+      style: {
+        fill: activeTool === 'rectangle' ? '#3b82f6' : activeTool === 'circle' ? '#ef4444' : '#059669',
+        stroke: '#1e40af',
+        strokeWidth: 2,
+        opacity: 0.5,
+        ...(activeTool === 'text' && { fontSize: 16, fontFamily: 'Arial', textAlign: 'left' as const })
+      },
+      transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+      layer: 999,
+      visible: true,
+      locked: false,
+      isDirty: false,
+      ...(activeTool === 'text' && { text: 'New Text' })
+    };
+    setPreviewObject(preview);
   }
 }, [isPanning, lastPanPoint, viewport.x, viewport.y, panTo, isDrawing, isDrawingLine, isSelecting, selectionStart, isDragging, draggedObjects, dragStartPoint, originalObjectPositions, isResizing, resizeHandle, resizeStartBounds, resizeStartPoint, selectedIds, objects, activeTool, screenToWorld, drawStartPoint, linePoints, onObjectUpdate]);
 
@@ -463,13 +474,13 @@ const lastMoveTime = useRef(0);
 const handleMouseMove = useCallback((event: React.MouseEvent) => {
   const now = performance.now();
   
-  // FIXED: No throttling during dragging to prevent flickering
-  if (isDragging) {
+  // FIXED: No throttling during interactive operations to maintain smoothness
+  if (isDragging || isDrawing || isDrawingLine) {
     handleMouseMoveThrottled(event);
     return;
   }
 
-  // Light throttling for other operations
+  // Light throttling only for panning with many objects
   if (isPanning && objects.length > 200) {
     // Only throttle panning when there are many objects
     const panDelay = 16; // 60fps max
@@ -480,7 +491,7 @@ const handleMouseMove = useCallback((event: React.MouseEvent) => {
   }
   
   handleMouseMoveThrottled(event);
-}, [isDragging, isPanning, objects.length, handleMouseMoveThrottled]);
+}, [isDragging, isPanning, objects.length, handleMouseMoveThrottled, isDrawing, isDrawingLine]);
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
     setIsDragging(false);
@@ -602,7 +613,7 @@ const handleMouseMove = useCallback((event: React.MouseEvent) => {
       };
       
       // Only create if object has reasonable size
-      if (finalObject.bounds.width > 5 && finalObject.bounds.height > 5) {
+      if (finalObject.bounds.width > 2 && finalObject.bounds.height > 2) {
         onObjectCreate(finalObject);
         
         // For text objects, immediately enter edit mode
@@ -693,8 +704,16 @@ const handleMouseMove = useCallback((event: React.MouseEvent) => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Don't handle space when editing text
+      // Don't handle ANY shortcuts when editing text
       if (editingTextId) return;
+      
+      // Don't handle shortcuts if focused on input elements
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement?.tagName === 'INPUT' || 
+                            activeElement?.tagName === 'TEXTAREA' || 
+                            (activeElement as HTMLElement)?.contentEditable === 'true';
+      
+      if (isInputFocused) return;
       
       if (event.code === 'Space') {
         event.preventDefault();
@@ -740,8 +759,16 @@ const handleMouseMove = useCallback((event: React.MouseEvent) => {
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      // Don't handle space when editing text
+      // Don't handle ANY shortcuts when editing text
       if (editingTextId) return;
+      
+      // Don't handle shortcuts if focused on input elements
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement?.tagName === 'INPUT' || 
+                            activeElement?.tagName === 'TEXTAREA' || 
+                            (activeElement as HTMLElement)?.contentEditable === 'true';
+      
+      if (isInputFocused) return;
       
       if (event.code === 'Space') {
         setIsSpacePressed(false);
@@ -842,9 +869,47 @@ const handleMouseMove = useCallback((event: React.MouseEvent) => {
         Zoom: {Math.round(viewport.zoom * 100)}%
       </div>
 
-      {/* Instructions Overlay - MOVED TO TOP CENTER */}
-      <div className="modern-canvas-info absolute top-4 left-1/2 transform -translate-x-1/2 z-10 pointer-events-none">
-        Wheel: Zoom • Space+drag: Pan • Drag: Select • V/R/C/T/L: Tools • {getModifierKey()}+C/V: Copy/Paste
+      {/* Smart Instructions Overlay */}
+      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 pointer-events-none">
+        <div 
+          className="modern-canvas-info"
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid var(--color-border-light)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '8px 16px',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: 'var(--color-text-primary)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            maxWidth: '600px',
+            textAlign: 'center'
+          }}
+        >
+          {(() => {
+            // Smart instructions based on current tool and activity
+            if (activeTool === 'rectangle') {
+              return "Click and drag to draw rectangles • Press V to switch to select tool";
+            } else if (activeTool === 'circle') {
+              return "Click and drag to draw circles • Press V to switch to select tool";
+            } else if (activeTool === 'text') {
+              return "Click and drag to create text boxes • Press V to switch to select tool";
+            } else if (activeTool === 'line') {
+              return "Click to start drawing lines, click again to add points • Press V to switch to select tool";
+            } else if (objects.length === 0 && showWelcome) {
+              // First-time user guidance
+              return "Welcome! Press R for Rectangle, C for Circle, T for Text, L for Line • Wheel to zoom, Space+drag to pan";
+            } else if (objects.length === 0) {
+              // User has started interacting
+              return "Press R/C/T/L to draw • Click to select • Wheel to zoom • Space+drag to pan";
+            } else if (selectedIds.length > 0) {
+              return `${selectedIds.length} selected • Drag to move • ${getModifierKey()}+C/V: Copy/Paste • Delete to remove`;
+            } else {
+              return "Click objects to select • R/C/T/L: Draw tools • Wheel: Zoom • Space+drag: Pan • Double-click text to edit";
+            }
+          })()}
+        </div>
       </div>
 
       {/* Text Input Overlay */}
@@ -861,6 +926,27 @@ const handleMouseMove = useCallback((event: React.MouseEvent) => {
           />
         ) : null;
       })()}
+
+      {/* Beginner's Help Overlay */}
+      {objects.length === 0 && showWelcome && (
+        <div 
+          className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10 pointer-events-none"
+          style={{
+            background: 'rgba(59, 130, 246, 0.95)',
+            color: 'white',
+            padding: '12px 20px',
+            borderRadius: 'var(--radius-lg)',
+            fontSize: '14px',
+            fontWeight: 500,
+            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+            backdropFilter: 'blur(8px)',
+            maxWidth: '500px',
+            textAlign: 'center'
+          }}
+        >
+          👆 Start by selecting a tool from the left sidebar, then click and drag on the canvas to create shapes
+        </div>
+      )}
 
       {/* Selection Box */}
       {isSelecting && selectionBox && selectionBox.width > 0 && selectionBox.height > 0 && (

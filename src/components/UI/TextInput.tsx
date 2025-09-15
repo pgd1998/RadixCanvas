@@ -39,6 +39,9 @@ export function TextInput({
   }, []);
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    // Prevent all keyboard events from bubbling up to canvas
+    event.stopPropagation();
+    
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       onComplete();
@@ -46,6 +49,12 @@ export function TextInput({
       event.preventDefault();
       onCancel();
     }
+    // Allow all other keys (including Space) to work normally
+  };
+
+  const handleKeyUp = (event: React.KeyboardEvent) => {
+    // Prevent all keyboard events from bubbling up to canvas
+    event.stopPropagation();
   };
 
   const handleBlur = () => {
@@ -58,6 +67,7 @@ export function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={handleKeyDown}
+      onKeyUp={handleKeyUp}
       onBlur={handleBlur}
       className="absolute border-2 border-blue-500 bg-white text-gray-900 resize-none outline-none z-50"
       style={{

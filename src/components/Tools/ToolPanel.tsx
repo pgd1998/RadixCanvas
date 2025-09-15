@@ -12,30 +12,35 @@ const tools = [
   {
     id: 'select' as ToolType,
     name: 'Select',
+    description: 'Select and move objects',
     icon: MousePointer,
     shortcut: 'V',
   },
   {
     id: 'rectangle' as ToolType,
     name: 'Rectangle',
+    description: 'Draw rectangles',
     icon: Square,
     shortcut: 'R',
   },
   {
     id: 'circle' as ToolType,
-    name: 'Circle', 
+    name: 'Circle',
+    description: 'Draw circles and ellipses',
     icon: Circle,
     shortcut: 'C',
   },
   {
     id: 'text' as ToolType,
     name: 'Text',
+    description: 'Add text labels',
     icon: Type,
     shortcut: 'T',
   },
   {
     id: 'line' as ToolType,
     name: 'Line',
+    description: 'Draw lines and paths',
     icon: Minus,
     shortcut: 'L',
   }
@@ -69,10 +74,17 @@ export function ToolPanel({ activeTool, onToolChange }: ToolPanelProps) {
                   side="right"
                   sideOffset={8}
                 >
-                  {tool.name}
-                  {tool.shortcut && (
-                    <span style={{ marginLeft: '8px', opacity: 0.7 }}>({tool.shortcut})</span>
-                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ fontWeight: 600 }}>
+                      {tool.name}
+                      {tool.shortcut && (
+                        <span style={{ marginLeft: '8px', opacity: 0.7, fontWeight: 400 }}>({tool.shortcut})</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                      {tool.description}
+                    </div>
+                  </div>
                   <Tooltip.Arrow className="fill-current" />
                 </Tooltip.Content>
               </Tooltip.Portal>

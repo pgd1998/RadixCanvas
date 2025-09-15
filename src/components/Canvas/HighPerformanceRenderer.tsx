@@ -52,11 +52,12 @@ export const HighPerformanceRenderer = React.memo(function HighPerformanceRender
   const shouldRebuildQuadTree = useRef(true);
   
   
-  // Efficiently rebuild QuadTree when objects change
+  // Efficiently rebuild QuadTree when objects change (excluding preview objects)
   useMemo(() => {
-    if (objects.length !== lastObjectCount.current || shouldRebuildQuadTree.current) {
-      quadTree.current.rebuild(objects);
-      lastObjectCount.current = objects.length;
+    const regularObjects = objects.filter(obj => obj.id !== 'preview');
+    if (regularObjects.length !== lastObjectCount.current || shouldRebuildQuadTree.current) {
+      quadTree.current.rebuild(regularObjects);
+      lastObjectCount.current = regularObjects.length;
       shouldRebuildQuadTree.current = false;
     }
   }, [objects]);
@@ -118,7 +119,7 @@ export const HighPerformanceRenderer = React.memo(function HighPerformanceRender
     return path;
   }, [generatePathKey]);
   
-  // Ultra-fast viewport culling using QuadTree
+  // Ultra-fast viewport culling using QuadTree + special handling for preview objects
   const getVisibleObjects = useCallback((rect: DOMRect): CanvasObject[] => {
     const viewBounds = tempBounds.current;
     
@@ -129,22 +130,36 @@ export const HighPerformanceRenderer = React.memo(function HighPerformanceRender
     viewBounds.width = (rect.width / viewport.zoom) + (margin * 2);
     viewBounds.height = (rect.height / viewport.zoom) + (margin * 2);
     
-    // Use QuadTree for O(log n) spatial queries
-    const candidateObjects = quadTree.current.retrieve(viewBounds);
-    
     // Reuse the visible objects array to avoid allocations
     visibleObjectsPool.current.length = 0;
     
-    // Final visibility test with precise bounds checking
-    for (let i = 0; i < candidateObjects.length; i++) {
-      const obj = candidateObjects[i];
-      if (obj.visible) {
-        visibleObjectsPool.current.push(obj);
+    // Always include preview objects (bypass QuadTree for these)
+    const previewObjects = objects.filter(obj => obj.id === 'preview');
+    
+    if (previewObjects.length > 0) {
+      // For preview objects, always include them regardless of culling
+      visibleObjectsPool.current.push(...previewObjects);
+    }
+    
+    // Use QuadTree for regular objects
+    const regularObjects = objects.filter(obj => obj.id !== 'preview');
+    if (regularObjects.length > 0) {
+      // Rebuild QuadTree with just regular objects if needed
+      if (quadTree.current && regularObjects.length > 0) {
+        const candidateObjects = quadTree.current.retrieve(viewBounds);
+        
+        // Final visibility test with precise bounds checking
+        for (let i = 0; i < candidateObjects.length; i++) {
+          const obj = candidateObjects[i];
+          if (obj.visible && obj.id !== 'preview') {
+            visibleObjectsPool.current.push(obj);
+          }
+        }
       }
     }
     
     return visibleObjectsPool.current;
-  }, [viewport, isDragging, isPanning]);
+  }, [viewport, isDragging, isPanning, objects]);
   
   
   // Ultra-optimized object renderer with batching and LOD
@@ -164,7 +179,8 @@ export const HighPerformanceRenderer = React.memo(function HighPerformanceRender
     if (hasRotation) ctx.rotate(obj.transform.rotation);
     if (hasScale) ctx.scale(obj.transform.scaleX, obj.transform.scaleY);
     
-    // Level of detail optimization
+    // Level of detail optimization (skip LOD for preview objects)
+    const isPreview = obj.id === 'preview';
     const screenSize = Math.max(
       obj.bounds.width * viewport.zoom,
       obj.bounds.height * viewport.zoom
@@ -173,11 +189,11 @@ export const HighPerformanceRenderer = React.memo(function HighPerformanceRender
     // Set opacity directly
     ctx.globalAlpha = obj.style.opacity;
     
-    if (screenSize < 3) {
+    if (!isPreview && screenSize < 3) {
       // Ultra-fast rendering for tiny objects (single pixel)
       ctx.fillStyle = obj.style.fill !== 'transparent' ? obj.style.fill : obj.style.stroke;
       ctx.fillRect(0, 0, obj.bounds.width, obj.bounds.height);
-    } else if (screenSize < 8) {
+    } else if (!isPreview && screenSize < 8) {
       // Fast rendering for small objects (no stroke, simplified shapes)
       if (obj.style.fill !== 'transparent') {
         ctx.fillStyle = obj.style.fill;
@@ -237,7 +253,7 @@ export const HighPerformanceRenderer = React.memo(function HighPerformanceRender
         }
         
         case 'text':
-          if (obj.text && screenSize > 12) { // Only render text if large enough
+          if (obj.text && (isPreview || screenSize > 12)) { // Always render preview text
             const fontSize = obj.style.fontSize || 16;
             const fontFamily = obj.style.fontFamily || 'Arial';
             ctx.font = `${fontSize}px ${fontFamily}`;
@@ -277,9 +293,10 @@ export const HighPerformanceRenderer = React.memo(function HighPerformanceRender
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Target 125+ FPS (8ms max frame time)
+    // Adaptive frame targeting - more responsive during interactions
     const now = performance.now();
-    const targetFrameTime = 8;
+    const hasPreviewObject = objects.some(obj => obj.id === 'preview');
+    const targetFrameTime = hasPreviewObject ? 4 : isDragging ? 8 : 16; // Very fast during drawing
     
     if (now - lastRenderTime.current < targetFrameTime) {
       if (renderRequestId.current) {
